@@ -1608,14 +1608,11 @@ const app = {
         document.getElementById('badgeBinTab').textContent = binned;
         document.getElementById('badgeRegister').textContent = active.filter(t => t.status !== 'Completed').length;
 
-        // Mirror the two badges that moved into the "More" popup, plus a
-        // combined indicator on the More button itself (mobile bottom bar).
-        const bC = document.getElementById('badgeCompletedTabMore'); if (bC) bC.textContent = completed;
-        const bB = document.getElementById('badgeBinTabMore'); if (bB) bB.textContent = binned;
-        const moreBadge = document.getElementById('badgeMoreTab');
-        if (moreBadge) {
-            moreBadge.textContent = binned;
-            moreBadge.style.display = binned > 0 ? '' : 'none';
+        // Mirror the Bin count onto its header icon button (mobile).
+        const binHeaderBadge = document.getElementById('badgeBinHeader');
+        if (binHeaderBadge) {
+            binHeaderBadge.textContent = binned;
+            binHeaderBadge.style.display = binned > 0 ? '' : 'none';
         }
     },
 
@@ -2014,7 +2011,7 @@ const app = {
 
     // Visual order of the tabs in the bottom/segmented tabbar — also the
     // order swipe-left/right steps through.
-    TAB_ORDER: ['Dashboard', 'Register', 'Completed', 'Holidays', 'Bin', 'Config'],
+    TAB_ORDER: ['Dashboard', 'Register', 'Holidays', 'Completed', 'Bin', 'Config'],
 
     switchTab(tab, dir) {
         if (tab !== this.currentTab) this.exitSelectMode();
@@ -2066,12 +2063,10 @@ const app = {
         if (btn) btn.classList.add('active');
         document.getElementById('screenTitle').textContent = titles[tab] || tab;
 
-        // The "More" bottom-bar button represents Done/Holidays/Bin/Config —
-        // light it up (and the matching popup row) whenever one of those is open.
-        const moreTabs = ['Completed', 'Holidays', 'Bin', 'Config'];
-        const moreBtn = document.getElementById('moreTabBtn');
-        if (moreBtn) moreBtn.classList.toggle('active', moreTabs.includes(tab));
-        document.querySelectorAll('.more-menu-item').forEach(el => el.classList.toggle('active', el.dataset.tab === tab));
+        // Bin and Config live as icon-only buttons in the header (mobile) —
+        // light up whichever one matches the active tab, same idea as the
+        // tabbar-btn active state above.
+        document.querySelectorAll('.icon-tab-btn').forEach(el => el.classList.toggle('active', el.dataset.tab === tab));
 
         this.renderTable();
     },

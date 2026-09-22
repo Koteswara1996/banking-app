@@ -1083,47 +1083,28 @@
         html[data-shell="mobile"] .dash-controls .filter-select { flex: 1 1 100%; }
         html[data-shell="mobile"] .dash-controls > span { margin-left: 0; }
 
-        /* Mobile bottom bar shows only Dashboard / Tasks / More — the rest
-           move into the popup below. Desktop keeps all six inline as before
-           and never shows the More button. */
-        html[data-shell="mobile"] .tabbar-btn[data-tab="Completed"],
-        html[data-shell="mobile"] .tabbar-btn[data-tab="Holidays"],
+        /* Mobile bottom bar shows Dashboard / Tasks / Holidays / Done, in
+           that visual order (via `order`, DOM/desktop order untouched).
+           Bin and Config move to icon-only buttons in the header instead —
+           desktop keeps all six inline in the segmented control as before. */
+        html[data-shell="mobile"] .tabbar-btn[data-tab="Dashboard"] { order: 1; }
+        html[data-shell="mobile"] .tabbar-btn[data-tab="Register"]  { order: 2; }
+        html[data-shell="mobile"] .tabbar-btn[data-tab="Holidays"]  { order: 3; }
+        html[data-shell="mobile"] .tabbar-btn[data-tab="Completed"] { order: 4; }
         html[data-shell="mobile"] .tabbar-btn[data-tab="Bin"],
         html[data-shell="mobile"] .tabbar-btn[data-tab="Config"] { display: none; }
-        html:not([data-shell="mobile"]) .more-tab-btn,
-        html:not([data-shell="mobile"]) .more-menu,
-        html:not([data-shell="mobile"]) .more-menu-backdrop { display: none; }
 
-        .more-menu-backdrop {
-            display: none; position: fixed; inset: 0; z-index: 92; background: rgba(0,0,0,0.15);
+        .icon-tab-btn {
+            display: none; position: relative; align-items: center; justify-content: center;
+            width: 36px; height: 36px; padding: 0; border-radius: 50%;
+            background: transparent; border: 1px solid transparent; color: var(--label-2);
+            cursor: pointer; transition: all 0.2s var(--ease);
         }
-        .more-menu-backdrop.open { display: block; }
-        .more-menu {
-            position: fixed; right: 16px; z-index: 93;
-            bottom: calc(var(--tabbar-h) + 32px + env(safe-area-inset-bottom, 0px));
-            display: flex; flex-direction: column-reverse; gap: 10px;
-        }
-        .more-menu-item {
-            pointer-events: none; opacity: 0; transform: translateY(10px) scale(0.92);
-            display: flex; align-items: center; gap: 10px; padding: 11px 18px 11px 14px;
-            background: var(--glass-header-bg); border: 1px solid var(--glass-border);
-            border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.16), var(--glass-inset);
-            backdrop-filter: saturate(180%) blur(28px); -webkit-backdrop-filter: saturate(180%) blur(28px);
-            font-size: 0.86rem; font-weight: 700; color: var(--label); white-space: nowrap;
-            transition: opacity 0.18s var(--ease), transform 0.18s var(--ease);
-        }
-        .more-menu.open .more-menu-item { pointer-events: auto; opacity: 1; transform: translateY(0) scale(1); }
-        /* Nearest item to the More button (Done) appears first, then the
-           rest unstack upward one by one. */
-        .more-menu.open .more-menu-item:nth-child(1) { transition-delay: 0s; }
-        .more-menu.open .more-menu-item:nth-child(2) { transition-delay: 0.05s; }
-        .more-menu.open .more-menu-item:nth-child(3) { transition-delay: 0.10s; }
-        .more-menu.open .more-menu-item:nth-child(4) { transition-delay: 0.15s; }
-        .more-menu-item .more-ico { width: 20px; height: 20px; flex-shrink: 0; display: flex; }
-        .more-menu-item .more-ico svg { width: 100%; height: 100%; stroke-width: 2; }
-        .more-menu-item .badge { margin-left: 2px; }
-        .more-menu-item.active { border-color: var(--accent); color: var(--accent); }
-        .tabbar-btn.more-tab-btn.active { background: var(--fill); }
+        .icon-tab-btn svg { width: 19px; height: 19px; stroke-width: 2.1; }
+        .icon-tab-btn:hover { background: var(--fill); color: var(--label); }
+        .icon-tab-btn.active { color: var(--accent); background: var(--glass-bg); border-color: var(--glass-border); }
+        .icon-tab-btn .badge { position: absolute; top: -2px; right: -4px; min-width: 16px; height: 16px; line-height: 16px; font-size: 0.6rem; padding: 0 4px; }
+        html[data-shell="mobile"] .icon-tab-btn { display: inline-flex; }
 
         /* Config tab — cleaner fixed grids instead of flex-wrap, which
            squeezed the theme buttons together on narrow screens — and
@@ -1352,6 +1333,13 @@
         </div>
 
         <div class="appbar-right">
+            <button class="icon-tab-btn" id="binHeaderBtn" data-tab="Bin" onclick="app.switchTab('Bin')" title="Bin">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>
+                <span class="badge red" id="badgeBinHeader" style="display:none;">0</span>
+            </button>
+            <button class="icon-tab-btn" id="configHeaderBtn" data-tab="Config" onclick="app.switchTab('Config')" title="Config">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg>
+            </button>
             <div class="autosave" id="saveStatus"><span class="dot"></span> Saved</div>
         </div>
     </header>
@@ -1365,11 +1353,6 @@
                 <span class="tabbar-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></span>
                 <span class="tabbar-lbl">Tasks</span>
                 <span class="badge" id="badgeRegister">0</span>
-            </button>
-            <button class="tabbar-btn more-tab-btn" id="moreTabBtn" data-tab="More" onclick="app.toggleMoreMenu()">
-                <span class="tabbar-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg></span>
-                <span class="tabbar-lbl">More</span>
-                <span class="badge red" id="badgeMoreTab" style="display:none;">0</span>
             </button>
             <button class="tabbar-btn" data-tab="Completed" onclick="app.switchTab('Completed')">
                 <span class="tabbar-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6.5 9.5 17 4 11.5"/></svg></span>
@@ -1390,32 +1373,6 @@
                 <span class="tabbar-lbl">Config</span>
             </button>
         </nav>
-
-        <!-- "More" popup — the four tabs that don't fit the mobile bottom bar.
-             Fixed to the viewport (header-wrap has no transform/filter of its
-             own, so this isn't affected by the containing-block issue noted
-             above). Desktop never opens this; all six tabs already show. -->
-        <div class="more-menu-backdrop" id="moreMenuBackdrop" onclick="app.closeMoreMenu()"></div>
-        <div class="more-menu" id="moreMenu">
-            <button class="more-menu-item" data-tab="Completed" onclick="app.switchTab('Completed')">
-                <span class="more-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6.5 9.5 17 4 11.5"/></svg></span>
-                <span>Done</span>
-                <span class="badge" id="badgeCompletedTabMore">0</span>
-            </button>
-            <button class="more-menu-item" data-tab="Holidays" onclick="app.switchTab('Holidays')">
-                <span class="more-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
-                <span>Holidays</span>
-            </button>
-            <button class="more-menu-item" data-tab="Bin" onclick="app.switchTab('Bin')">
-                <span class="more-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></span>
-                <span>Bin</span>
-                <span class="badge red" id="badgeBinTabMore">0</span>
-            </button>
-            <button class="more-menu-item" data-tab="Config" onclick="app.switchTab('Config')">
-                <span class="more-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg></span>
-                <span>Config</span>
-            </button>
-        </div>
     </div>
 
     <!-- OVERVIEW TAB -->
