@@ -1,0 +1,6 @@
+{
+  "appId": "com.purenergy.bankingtracker",
+  "appName": "Bank Tracker",
+  "webDir": "www",
+  "bundledWebRuntime": false
+}

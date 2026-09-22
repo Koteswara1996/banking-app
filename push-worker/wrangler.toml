@@ -1,0 +1,25 @@
+name = "btw-push-worker"
+main = "worker.js"
+compatibility_date = "2024-11-01"
+
+# How often to check for overdue/due-soon tasks. Every 15 minutes is a
+# reasonable default — tight enough to catch a "due soon" window, loose
+# enough to stay well inside Cloudflare's free-tier cron limits.
+[triggers]
+crons = ["*/15 * * * *"]
+
+# Plain (non-secret) settings. VAPID_PRIVATE_KEY and WORKER_SECRET are NOT
+# here on purpose — set those with `wrangler secret put`, see PUSH_SETUP.md.
+[vars]
+APPS_SCRIPT_URL = "https://script.google.com/macros/s/REPLACE_WITH_YOUR_DEPLOYMENT_ID/exec"
+VAPID_PUBLIC_KEY = "BPhpwyza70t8kNJFT28ZUC7xNi_ycIJEi3ZlEsHfxCf9_EFtEHgBtRaeQbNiO9fwJ54RGiVTS-0zM2jBTHUsTak"
+VAPID_SUBJECT = "mailto:REPLACE_WITH_YOUR_EMAIL@example.com"
+TIMEZONE = "Asia/Kolkata"
+DUE_SOON_MINUTES = "60"
+
+# Create this KV namespace first (`wrangler kv namespace create PUSH_DEDUPE`)
+# and paste the id it prints here — it's how the Worker avoids re-alerting
+# you for the same task every 15 minutes.
+[[kv_namespaces]]
+binding = "PUSH_DEDUPE"
+id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"

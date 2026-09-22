@@ -1,0 +1,1923 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="pearl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#e2e8f2">
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+    <meta name="description" content="Track banking follow-ups, payment deadlines and mail chains.">
+    <link rel="manifest" href="./manifest.webmanifest">
+    <link rel="icon" href="./favicon.png" sizes="64x64" type="image/png">
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <title>Banking Work Tracker — Web Application Dashboard</title>
+    <script>
+        /* Paint in the saved theme before the first frame, so neither the boot
+           screen nor the app flashes Pearl on the way to your chosen theme. */
+        (function () {
+            try {
+                var t = localStorage.getItem('pureEnergyTheme');
+                if (t) document.documentElement.setAttribute('data-theme', t);
+            } catch (e) {}
+            window.__bootAt = Date.now();
+
+            /* Decide the shell before anything paints. A phone asking for the
+               desktop site fakes a ~980px viewport but still reports a coarse
+               pointer, so check both. app.js reuses this exact function. */
+            window.__shell = function () {
+                var w = window.innerWidth || document.documentElement.clientWidth || 1024;
+                var coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+                if (w <= 900) return 'mobile';
+                if (coarse && w <= 1180) return 'mobile';
+                return 'desktop';
+            };
+            document.documentElement.setAttribute('data-shell', window.__shell());
+        })();
+    </script>
+    <style>
+        /* =========================================================
+           Banking Work Tracker — iOS Glassy Finish UI
+           True iOS 17 frosted-glass system: layered translucency,
+           specular highlights, deep backdrop blur throughout.
+           ========================================================= */
+
+        /* ── THEME 1: Pearl (iOS Default) ──────────────────────── */
+        :root, html[data-theme="pearl"] {
+            --canvas-bg: linear-gradient(145deg, #e8edf5 0%, #dce4f0 40%, #e4dff5 100%);
+            --canvas-solid: #e2e8f2;
+
+            /* Glass layers — true iOS translucency stack */
+            --glass-bg:        rgba(255, 255, 255, 0.62);
+            --glass-bg-hover:  rgba(255, 255, 255, 0.82);
+            --glass-header-bg: rgba(242, 242, 247, 0.78);   /* header / toolbar frosted */
+            --glass-th-bg:     rgba(248, 248, 252, 0.92);   /* thead — opaque enough to hide rows */
+            --glass-modal-bg:  rgba(255, 255, 255, 0.72);
+            --glass-border:    rgba(255, 255, 255, 0.55);
+            --glass-border-subtle: rgba(255, 255, 255, 0.45);
+            --glass-specular:  rgba(255, 255, 255, 0.80);   /* top-edge highlight */
+            --glass-shadow:    0 8px 40px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0,0,0,0.04);
+            --glass-shadow-sm: 0 4px 20px rgba(0, 0, 0, 0.05);
+            --glass-inset:     inset 0 1px 0 rgba(255,255,255,0.8); /* specular top line */
+
+            --label: #1c1c1e; --label-2: #8e8e93; --label-3: #aeaeb2;
+            --separator: rgba(60,60,67,0.1); --line: rgba(60,60,67,0.1); --line-strong: rgba(60,60,67,0.18);
+            --fill: rgba(120,120,128,0.08); --fill-2: rgba(120,120,128,0.14);
+            --input-bg: rgba(255,255,255,0.7);
+            --accent: #007aff; --blue: #007aff; --blue-ink: #0055cc;
+            --red: #ff3b30; --red-ink: #c9000a; --green: #34c759; --green-ink: #1a7d33;
+            --amber: #ff9500; --amber-ink: #8f4a00; --violet: #af52de; --violet-ink: #6e2a9e;
+            --slate: #8e8e93; color-scheme: light;
+        }
+
+        /* ── THEME 2: Glassmorphism ────────────────────────────────
+           Frosted panes over a colourful backdrop. Heavier blur, more
+           transparency, bright hairline edges. */
+        html[data-theme="glass"] {
+            --canvas-bg: linear-gradient(135deg, #a8c8ff 0%, #c9b6ff 35%, #ffc2e8 70%, #a5f0e4 100%);
+            --canvas-solid: #bfc9f5;
+
+            --glass-bg:        rgba(255, 255, 255, 0.34);
+            --glass-bg-hover:  rgba(255, 255, 255, 0.52);
+            --glass-header-bg: rgba(255, 255, 255, 0.42);
+            --glass-th-bg:     rgba(255, 255, 255, 0.68);
+            --glass-modal-bg:  rgba(255, 255, 255, 0.46);
+            --glass-border:    rgba(255, 255, 255, 0.62);
+            --glass-border-subtle: rgba(255, 255, 255, 0.42);
+            --glass-specular:  rgba(255, 255, 255, 0.92);
+            --glass-shadow:    0 12px 44px rgba(49, 46, 129, 0.18), 0 2px 10px rgba(49, 46, 129, 0.08);
+            --glass-shadow-sm: 0 6px 22px rgba(49, 46, 129, 0.12);
+            --glass-inset:     inset 0 1px 0 rgba(255,255,255,0.95);
+
+            --label: #1e1b4b; --label-2: #4c469c; --label-3: #8b87c9;
+            --separator: rgba(49,46,129,0.14); --line: rgba(255,255,255,0.45); --line-strong: rgba(255,255,255,0.7);
+            --fill: rgba(255,255,255,0.26); --fill-2: rgba(255,255,255,0.42);
+            --input-bg: rgba(255,255,255,0.46);
+            --accent: #4f46e5; --blue: #2563eb; --blue-ink: #3730a3;
+            --red: #f43f5e; --red-ink: #9f1239; --green: #10b981; --green-ink: #065f46;
+            --amber: #f59e0b; --amber-ink: #92400e; --violet: #8b5cf6; --violet-ink: #5b21b6;
+            --slate: #4c469c; color-scheme: light;
+        }
+        html[data-theme="glass"] .stat-tile, html[data-theme="glass"] .appbar,
+        html[data-theme="glass"] .cfg-section, html[data-theme="glass"] .mini-tile,
+        html[data-theme="glass"] .single-line-toolbar, html[data-theme="glass"] .tabbar,
+        html[data-theme="glass"] .modal-content, html[data-theme="glass"] .ms-options,
+        html[data-theme="glass"] .table-container, html[data-theme="glass"] .tcard {
+            backdrop-filter: saturate(200%) blur(40px) !important;
+            -webkit-backdrop-filter: saturate(200%) blur(40px) !important;
+        }
+
+        /* ── THEME 3: Neumorphism (Soft UI) ────────────────────────
+           One flat surface. Nothing floats, nothing is see-through —
+           shapes are pressed out of the background with paired shadows. */
+        html[data-theme="neuo"] {
+            --canvas-bg: linear-gradient(145deg, #e8edf4 0%, #e2e8f0 100%);
+            --canvas-solid: #e6ebf2;
+
+            --glass-bg:        #e9eef5;
+            --glass-bg-hover:  #eef2f8;
+            --glass-header-bg: #e9eef5;
+            --glass-th-bg:     #e4eaf2;
+            --glass-modal-bg:  #e9eef5;
+            --glass-border:    transparent;
+            --glass-border-subtle: transparent;
+            --glass-specular:  transparent;
+            --glass-shadow:    8px 8px 18px rgba(163,177,198,0.55), -8px -8px 18px rgba(255,255,255,0.95);
+            --glass-shadow-sm: 5px 5px 12px rgba(163,177,198,0.45), -5px -5px 12px rgba(255,255,255,0.9);
+            --glass-inset:     inset 0 0 0 1px rgba(255,255,255,0.35);
+
+            --label: #2d3a4e; --label-2: #7688a1; --label-3: #9dabbd;
+            --separator: rgba(163,177,198,0.35); --line: rgba(163,177,198,0.4); --line-strong: rgba(163,177,198,0.6);
+            --fill: rgba(163,177,198,0.16); --fill-2: rgba(163,177,198,0.3);
+            --input-bg: #e4eaf2;
+            --accent: #5b7cfa; --blue: #5b7cfa; --blue-ink: #3a55c9;
+            --red: #f4736b; --red-ink: #c0392b; --green: #4fc38a; --green-ink: #2a8259;
+            --amber: #f0a441; --amber-ink: #a9661a; --violet: #9b7ff0; --violet-ink: #6b4ec2;
+            --slate: #7688a1; color-scheme: light;
+        }
+        /* Soft UI has no translucency, so the blur mixin has to stand down. */
+        html[data-theme="neuo"] .stat-tile, html[data-theme="neuo"] .appbar,
+        html[data-theme="neuo"] .cfg-section, html[data-theme="neuo"] .mini-tile,
+        html[data-theme="neuo"] .single-line-toolbar, html[data-theme="neuo"] .tabbar,
+        html[data-theme="neuo"] .modal-content, html[data-theme="neuo"] .ms-options,
+        html[data-theme="neuo"] .table-container, html[data-theme="neuo"] .tcard {
+            backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+        }
+        html[data-theme="neuo"] .btn-icon,
+        html[data-theme="neuo"] .filter-input,
+        html[data-theme="neuo"] .filter-select,
+        html[data-theme="neuo"] .ms-header {
+            border: none;
+            box-shadow: 4px 4px 9px rgba(163,177,198,0.45), -4px -4px 9px rgba(255,255,255,0.92);
+        }
+        html[data-theme="neuo"] .btn-icon:active,
+        html[data-theme="neuo"] .filter-input:focus,
+        html[data-theme="neuo"] .filter-select:focus {
+            box-shadow: inset 4px 4px 9px rgba(163,177,198,0.5), inset -4px -4px 9px rgba(255,255,255,0.92);
+        }
+        html[data-theme="neuo"] td, html[data-theme="neuo"] th { background: transparent !important; }
+        html[data-theme="neuo"] tbody tr:hover td { background: rgba(255,255,255,0.45) !important; }
+
+        /* ── THEME 4: Claymorphism (Soft 3D) ───────────────────────
+           Fat rounded shapes with a puffy, moulded feel: a coloured
+           drop shadow underneath, two inner highlights on top. */
+        html[data-theme="clay"] {
+            --canvas-bg: linear-gradient(145deg, #e3e9ff 0%, #f0e6ff 45%, #dff0ff 100%);
+            --canvas-solid: #e7ecff;
+
+            --glass-bg:        rgba(255, 255, 255, 0.78);
+            --glass-bg-hover:  rgba(255, 255, 255, 0.92);
+            --glass-header-bg: rgba(255, 255, 255, 0.82);
+            --glass-th-bg:     rgba(250, 249, 255, 0.95);
+            --glass-modal-bg:  rgba(255, 255, 255, 0.86);
+            --glass-border:    rgba(255, 255, 255, 0.85);
+            --glass-border-subtle: rgba(255, 255, 255, 0.6);
+            --glass-specular:  rgba(255, 255, 255, 0.95);
+            --glass-shadow:    0 18px 34px rgba(109, 92, 214, 0.20), 0 6px 12px rgba(109, 92, 214, 0.12);
+            --glass-shadow-sm: 0 12px 24px rgba(109, 92, 214, 0.16);
+            --glass-inset:     inset 0 -8px 14px rgba(139, 92, 246, 0.14), inset 0 8px 12px rgba(255, 255, 255, 0.95);
+
+            --label: #312152; --label-2: #7a6aa8; --label-3: #b0a4d0;
+            --separator: rgba(109,92,214,0.14); --line: rgba(109,92,214,0.16); --line-strong: rgba(109,92,214,0.26);
+            --fill: rgba(139,92,246,0.08); --fill-2: rgba(139,92,246,0.16);
+            --input-bg: rgba(255,255,255,0.8);
+            --accent: #7c5cf0; --blue: #5b8def; --blue-ink: #3b5bc9;
+            --red: #fb7185; --red-ink: #be123c; --green: #4ade80; --green-ink: #15803d;
+            --amber: #fbbf24; --amber-ink: #b45309; --violet: #a78bfa; --violet-ink: #6d28d9;
+            --slate: #7a6aa8; color-scheme: light;
+        }
+        /* Clay is defined by how round it is. */
+        html[data-theme="clay"] .stat-tile,
+        html[data-theme="clay"] .mini-tile,
+        html[data-theme="clay"] .cfg-section,
+        html[data-theme="clay"] .tcard,
+        html[data-theme="clay"] .table-container,
+        html[data-theme="clay"] .single-line-toolbar,
+        html[data-theme="clay"] .empty-state { border-radius: 32px; }
+        html[data-theme="clay"] .btn-icon,
+        html[data-theme="clay"] .filter-input,
+        html[data-theme="clay"] .filter-select,
+        html[data-theme="clay"] .ms-header,
+        html[data-theme="clay"] .btn-modal { border-radius: 18px; }
+        html[data-theme="clay"] .appbar-mark { border-radius: 16px; }
+
+        /* ── THEME 5: The 3D Hero Object ───────────────────────────
+           A dark stage so one lit object carries the screen: deep
+           backdrop, saturated accent, layered depth shadows. */
+        html[data-theme="hero3d"] {
+            --canvas-bg: radial-gradient(1100px 620px at 18% -8%, #3b2a7a 0%, transparent 58%),
+                         radial-gradient(950px 560px at 92% 8%, #0e5e6e 0%, transparent 55%),
+                         linear-gradient(160deg, #0d1020 0%, #141936 55%, #0a0d1c 100%);
+            --canvas-solid: #10142a;
+
+            --glass-bg:        rgba(36, 41, 74, 0.60);
+            --glass-bg-hover:  rgba(48, 54, 94, 0.78);
+            --glass-header-bg: rgba(20, 25, 52, 0.82);
+            --glass-th-bg:     rgba(26, 31, 60, 0.95);
+            --glass-modal-bg:  rgba(28, 33, 64, 0.86);
+            --glass-border:    rgba(148, 163, 255, 0.20);
+            --glass-border-subtle: rgba(148, 163, 255, 0.13);
+            --glass-specular:  rgba(190, 200, 255, 0.35);
+            --glass-shadow:    0 26px 60px rgba(0, 0, 0, 0.55), 0 8px 20px rgba(79, 70, 229, 0.28);
+            --glass-shadow-sm: 0 14px 34px rgba(0, 0, 0, 0.45);
+            --glass-inset:     inset 0 1px 0 rgba(190, 200, 255, 0.22);
+
+            --label: #eef1ff; --label-2: #a9b2e0; --label-3: #6f78a8;
+            --separator: rgba(148,163,255,0.16); --line: rgba(148,163,255,0.18); --line-strong: rgba(148,163,255,0.32);
+            --fill: rgba(148,163,255,0.11); --fill-2: rgba(148,163,255,0.20);
+            --input-bg: rgba(16, 20, 44, 0.72);
+            --accent: #818cf8; --blue: #60a5fa; --blue-ink: #bfdbfe;
+            --red: #fb7185; --red-ink: #fecdd3; --green: #34d399; --green-ink: #a7f3d0;
+            --amber: #fbbf24; --amber-ink: #fde68a; --violet: #c084fc; --violet-ink: #e9d5ff;
+            --slate: #8b95c9; color-scheme: dark;
+        }
+        /* The toast paints white-on-var(--label); invert it on the dark stage. */
+        html[data-theme="hero3d"] .toast { color: #0d1020; background: #dfe4ff; }
+        html[data-theme="hero3d"] .toast-action { color: #312e81; background: rgba(49,46,129,0.12); border-color: rgba(49,46,129,0.3); }
+        /* Lift the mark off the page so it reads as a real object. */
+        html[data-theme="hero3d"] .appbar-mark {
+            background: linear-gradient(150deg, #a5b4fc 0%, #6366f1 46%, #3730a3 100%);
+            box-shadow: 0 12px 26px rgba(67, 56, 202, 0.6),
+                        inset 0 2px 3px rgba(255,255,255,0.55),
+                        inset 0 -3px 6px rgba(30, 27, 75, 0.6);
+        }
+        html[data-theme="hero3d"] .boot-tile { filter: drop-shadow(0 22px 46px rgba(99, 102, 241, 0.55)); }
+
+        /* ── GLOBAL BLUR MIXIN — every floating layer gets blur ── */
+        .stat-tile, .appbar, .cfg-section, .mini-tile,
+        .single-line-toolbar, .tabbar, .modal-content,
+        .ms-options, .table-container {
+            backdrop-filter: saturate(180%) blur(28px);
+            -webkit-backdrop-filter: saturate(180%) blur(28px);
+        }
+
+        /* ── ROOT CONSTANTS ─────────────────────────────────────── */
+        :root {
+            --appbar-h: 64px;
+            --tabbar-h: 64px;
+            --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+            --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            --font-main: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", sans-serif;
+            --font-num: "SF Pro Display", "Inter", -apple-system, system-ui, sans-serif;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font-main); -webkit-tap-highlight-color: transparent; }
+        html, body { height: 100%; height: 100dvh; overflow: hidden; -webkit-text-size-adjust: 100%; }
+
+        body {
+            display: flex; flex-direction: column;
+            background: var(--canvas-bg); color: var(--label);
+            font-size: 14px; line-height: 1.45;
+            font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased;
+        }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 10px; }
+        :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+        /* ── APP BAR ─────────────────────────────────────────────── */
+        .header-wrap { order: -2; flex-shrink: 0; position: relative; z-index: 60; }
+        .appbar {
+            flex-shrink: 0; z-index: 60;
+            display: flex; align-items: center; justify-content: space-between; gap: 14px;
+            height: var(--appbar-h); padding: 0 32px;
+            background: var(--glass-header-bg);
+            border-bottom: 1px solid var(--glass-border);
+            box-shadow: var(--glass-inset), 0 1px 0 var(--line), 0 4px 20px rgba(0,0,0,0.04);
+        }
+        .appbar-left { display: flex; align-items: center; gap: 14px; min-width: 0; }
+        .appbar-mark {
+            flex-shrink: 0; width: 34px; height: 34px; display: grid; place-items: center;
+            background: var(--accent); border-radius: 9px; color: #fff;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.25);
+        }
+        .appbar-mark.busy svg { animation: spin 1s linear infinite; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        .appbar-mark svg { width: 18px; height: 18px; stroke: #fff; }
+        .appbar-title { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.015em;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .appbar-sub { font-size: 0.8rem; color: var(--label-2); font-weight: 500;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .appbar-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+        /* The title gives way before the tabs do, so they can never collide. */
+        .appbar-left > div { min-width: 0; }
+
+        .autosave {
+            display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px;
+            font-size: 0.75rem; font-weight: 600; color: var(--label-2);
+            background: var(--fill); border: 1px solid var(--glass-border-subtle);
+            border-radius: 20px; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+        }
+        .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+
+        /* ── SEGMENTED TABS (desktop) ────────────────────────────── 
+           Positioned over the header rather than laid out inside it, since
+           it's now a sibling of .appbar (see header-wrap note above). */
+        .tabbar {
+            display: flex; align-items: center; gap: 4px; padding: 4px;
+            background: var(--fill);
+            border: 1px solid var(--glass-border-subtle); border-radius: 13px;
+            box-shadow: var(--glass-inset);
+            position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+            height: var(--appbar-h); z-index: 61;
+        }
+        .tabbar-btn {
+            position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+            height: 36px; padding: 0 18px; font-size: 0.85rem; font-weight: 600; color: var(--label-2);
+            background: transparent; border: none; border-radius: 9px; cursor: pointer; transition: all 0.2s var(--ease);
+        }
+        .tabbar-btn:hover { color: var(--label); background: var(--fill-2); }
+        .tabbar-btn.active {
+            color: var(--accent); background: var(--glass-bg);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08), var(--glass-inset); font-weight: 700;
+        }
+        .tabbar-ico { display: none; }
+        .badge {
+            min-width: 18px; height: 18px; padding: 0 5px; font-size: 0.65rem; font-weight: 700;
+            display: inline-flex; align-items: center; justify-content: center; border-radius: 20px;
+            color: var(--label-2); background: var(--fill-2);
+        }
+        .tabbar-btn.active .badge { background: var(--accent); color: #fff; }
+        .badge.red { color: #fff; background: var(--red); }
+
+        /* ── CONTENT AREA ────────────────────────────────────────── */
+        .content-area {
+            flex: 1 1 auto; min-height: 0; display: none;
+            overflow-y: auto; overflow-x: hidden; padding: 24px 28px 48px;
+            -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain;
+        }
+        .content-area.active { display: block; animation: viewFade 0.25s var(--ease) both; }
+        @keyframes viewFade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* ── SWIPE-TO-CHANGE-TAB ANIMATION ───────────────────────── */
+        .content-area.active.tab-swipe-next { animation: swipeInFromRight 0.28s var(--ease) both; }
+        .content-area.active.tab-swipe-prev { animation: swipeInFromLeft 0.28s var(--ease) both; }
+        @keyframes swipeInFromRight { from { opacity: 0; transform: translateX(38px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes swipeInFromLeft  { from { opacity: 0; transform: translateX(-38px); } to { opacity: 1; transform: translateX(0); } }
+
+        /* ── DASHBOARD GRID ──────────────────────────────────────── */
+        #dashboardTab { --gutter: max(16px, 1vw); }
+        #registerTab, #completedTab, #binTab, #holidaysTab { --gutter: max(16px, 1vw); padding: 18px var(--gutter) 48px; }
+        
+        .dash-controls {
+            display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin-bottom: 24px;
+            padding: 12px 20px;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border); border-radius: 18px;
+            box-shadow: var(--glass-shadow-sm), var(--glass-inset);
+            backdrop-filter: saturate(180%) blur(28px); -webkit-backdrop-filter: saturate(180%) blur(28px);
+        }
+        .dash-controls .filter-select { flex: 0 1 320px; min-width: 220px; }
+        .dash-controls > span { margin-left: auto; }
+        
+        .greet { margin-bottom: 14px; }
+        .greet-top { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; }
+        .greet-hint { font-size: 0.82rem; font-weight: 600; color: var(--label-3); }
+        .greet h1 { font-size: 2rem; font-weight: 800; letter-spacing: -0.025em; line-height: 1.2; }
+        .greet p { margin-top: 2px; font-size: 1rem; color: var(--label-2); font-weight: 500; }
+        .greet p b { color: var(--accent); font-weight: 700; }
+
+        /* ── WHOLE-RECORD TAP TO EDIT ────────────────────────────── */
+        tbody tr[data-record-id] { cursor: pointer; }
+        tbody tr[data-record-mode="bin"] { cursor: default; }
+        .tcard[data-record-id] { cursor: pointer; }
+        .tcard[data-record-mode="bin"] { cursor: default; }
+        .action-cell, .tcard-actions, .mailchain, .tcard-chips { cursor: default; }
+
+        /* ── TABLE TOOLBAR ───────────────────────────────────────── */
+        .toolbar-row {
+            position: sticky; top: 0; z-index: 150;
+            margin: -18px calc(var(--gutter, 16px) * -1) 0px;
+            background: var(--glass-header-bg);
+            border-bottom: 1px solid var(--glass-border);
+            backdrop-filter: saturate(180%) blur(32px);
+            -webkit-backdrop-filter: saturate(180%) blur(32px);
+            box-shadow: 0 1px 0 var(--line), 0 4px 16px rgba(0,0,0,0.04);
+        }
+        
+        .single-line-toolbar {
+            display: flex; align-items: center; gap: 10px; flex-wrap: nowrap;
+            overflow-x: auto; padding: 12px var(--gutter, 16px);
+        }
+        .single-line-toolbar::-webkit-scrollbar { display: none; }
+        .search-compact { flex: 0 0 180px; min-width: 140px; height: 38px; }
+        .toolbar-filters { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; }
+        .toolbar-actions { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; margin-left: auto; }
+        
+        .filter-input, .filter-select, .ms-header {
+            display: flex; align-items: center; height: 38px; padding: 0 12px;
+            font-size: 0.8rem; color: var(--label); font-weight: 500;
+            background: var(--input-bg);
+            border: 1px solid var(--glass-border); border-radius: 12px; outline: none;
+            transition: all 0.2s var(--ease);
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+        }
+        .filter-input:focus, .filter-select:focus, .ms-header:focus {
+            border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
+        }
+        .filter-select { width: 100%; min-width: 0; cursor: pointer; }
+        .filter-select.active-filter { border-color: var(--accent); font-weight: 700; }
+
+        .btn-filter-action {
+            display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+            height: 38px; padding: 0 18px; font-size: 0.9rem; font-weight: 600; color: var(--label);
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border); border-radius: 12px;
+            cursor: pointer; transition: all 0.2s var(--ease);
+            box-shadow: var(--glass-inset);
+        }
+        .btn-filter-action:hover { background: var(--glass-bg-hover); transform: translateY(-1px); }
+        .btn-filter-action.is-on { background: var(--accent); color: #fff; border-color: var(--accent); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+
+        .btn-new-entry { 
+            height: 38px; width: 38px; padding: 0; border-radius: 11px; 
+            font-size: 1.4rem; font-weight: 700; display: flex; align-items: center; justify-content: center; 
+            color: #fff; background: var(--accent); border: none; cursor: pointer;
+            box-shadow: 0 4px 16px color-mix(in srgb, var(--accent) 45%, transparent), inset 0 1px 0 rgba(255,255,255,0.25);
+            transition: all 0.2s var(--ease);
+        }
+        .btn-new-entry:hover { transform: translateY(-2px); box-shadow: 0 8px 24px color-mix(in srgb, var(--accent) 50%, transparent); }
+
+        .sub-text { display: flex; justify-content: space-between; align-items: center; padding: 12px 4px; font-size: 0.85rem; color: var(--label-2); font-weight: 600; }
+
+        /* ── MULTI-SELECT DROPDOWN ───────────────────────────────── */
+        .multi-select { position: relative; width: 100%; min-width: 0; }
+        .multi-select .ms-header { width: 100%; }
+        .ms-header > span, .ms-header { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .ms-header { justify-content: space-between; cursor: pointer; user-select: none; }
+        .ms-header::after { content: '▾'; margin-left: 8px; font-size: 0.85rem; color: var(--label-3); }
+        .ms-options {
+            position: fixed; top: 0; left: 0; z-index: 900; display: none;
+            overflow-y: auto; padding: 8px;
+            background: var(--glass-modal-bg);
+            border: 1px solid var(--glass-border); border-radius: 18px;
+            box-shadow: var(--glass-shadow), var(--glass-inset);
+        }
+        .ms-options.open { display: block; animation: dropFade 0.18s var(--ease) both; }
+        @keyframes dropFade { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+        .ms-options label {
+            display: flex; align-items: center; gap: 10px; padding: 12px 16px; font-size: 0.9rem;
+            color: var(--label); cursor: pointer; border-radius: 10px; transition: background 0.15s; font-weight: 500;
+        }
+        .ms-options label:hover, .ms-options label.active { background: var(--fill); }
+        .ms-options input[type="checkbox"] { accent-color: var(--accent); cursor: pointer; width: 18px; height: 18px; }
+
+        /* ══════════════════════════════════════════════════════════
+           TABLE — STICKY HEADER FIX
+           The table-container is a stacking context.
+           thead th uses `position: sticky; top: 0` relative to
+           the SCROLLING .table-container, NOT the page — so it
+           always overlays rows without fighting the toolbar.
+           ══════════════════════════════════════════════════════════ */
+        .table-wrap { position: relative; overflow: visible; background: transparent; border: none; box-shadow: none; padding-bottom: 20px; }
+
+        .table-container { 
+            width: 100%;
+            /* Crucial: overflow-y:auto makes this the scroll ancestor,
+               so sticky th is relative to THIS box, not the page.
+               This prevents rows from bleeding over the header. */
+            overflow-x: auto;
+            overflow-y: auto;
+            max-height: calc(100vh - var(--appbar-h) - 120px);
+            border-radius: 20px;
+            border: 1px solid var(--glass-border);
+            background: var(--glass-bg);
+            box-shadow: var(--glass-shadow), var(--glass-inset);
+            /* table-container itself gets blur from the global rule above */
+        }
+
+        /* Fixed layout + explicit column widths. Without this the browser's auto
+           algorithm collapses the Task column to a couple of characters wide
+           and every word wraps onto its own line. */
+        table { width: 100%; border-collapse: collapse; text-align: left; table-layout: fixed; }
+
+        #registerTable  { min-width: 1060px; }
+        #completedTable { min-width: 820px; }
+        #binTable       { min-width: 700px; }
+        #holidaysTable  { min-width: 700px; }
+
+        /* Register: Logged | Task | Category | Priority | Status | Pending | Due | Actions */
+        #registerColgroup col:nth-child(1) { width: 96px; }
+        #registerColgroup col:nth-child(2) { width: auto; }
+        #registerColgroup col:nth-child(3) { width: 148px; }
+        #registerColgroup col:nth-child(4) { width: 112px; }
+        #registerColgroup col:nth-child(5) { width: 136px; }
+        #registerColgroup col:nth-child(6) { width: 132px; }
+        #registerColgroup col:nth-child(7) { width: 150px; }
+        #registerColgroup col:nth-child(8) { width: 116px; }
+
+        /* Completed: Logged | Task | Category | Completed on | Actions */
+        #completedColgroup col:nth-child(1) { width: 112px; }
+        #completedColgroup col:nth-child(2) { width: auto; }
+        #completedColgroup col:nth-child(3) { width: 160px; }
+        #completedColgroup col:nth-child(4) { width: 136px; }
+        #completedColgroup col:nth-child(5) { width: 116px; }
+
+        /* Bin: Deleted | Task | Category | Actions */
+        #binColgroup col:nth-child(1) { width: 120px; }
+        #binColgroup col:nth-child(2) { width: auto; }
+        #binColgroup col:nth-child(3) { width: 160px; }
+        #binColgroup col:nth-child(4) { width: 116px; }
+
+        /* Holidays: Date | Holiday for | Next working day | Type */
+        #holidaysColgroup col:nth-child(1) { width: 130px; }
+        #holidaysColgroup col:nth-child(2) { width: auto; }
+        #holidaysColgroup col:nth-child(3) { width: 160px; }
+        #holidaysColgroup col:nth-child(4) { width: 180px; }
+        
+        /* ── THEAD — the sticky, opaque, non-overrideable header ── */
+        thead {
+            position: sticky;
+            top: 0;
+            z-index: 20;  /* above tbody rows */
+        }
+
+        th { 
+            /* NO position:sticky on individual th — thead as a group is sticky.
+               This is the correct pattern: sticky thead, not sticky th.
+               Individual th sticky fights with container scroll context. */
+            position: relative;
+            font-weight: 700; color: var(--label-2); 
+            font-size: 0.72rem; letter-spacing: 0.05em;
+            text-transform: uppercase; cursor: pointer; user-select: none;
+            padding: 13px 16px;
+            /* Fully opaque background so rows CANNOT bleed through */
+            background: var(--glass-th-bg) !important;
+            backdrop-filter: saturate(180%) blur(28px) !important;
+            -webkit-backdrop-filter: saturate(180%) blur(28px) !important;
+            /* Bottom separator */
+            border-bottom: 1.5px solid var(--line-strong);
+            /* Specular highlight at top */
+            box-shadow: inset 0 1px 0 var(--glass-specular);
+        }
+        th:first-child { border-radius: 19px 0 0 0; }
+        th:last-child  { border-radius: 0 19px 0 0; }
+        th:hover { color: var(--label); background: color-mix(in srgb, var(--glass-th-bg) 90%, var(--accent) 10%) !important; }
+        th span { margin-left: 5px; color: var(--accent); }
+        
+        /* ── TBODY rows ─────────────────────────────────────────── */
+        td { 
+            background: var(--glass-bg); 
+            padding: 13px 16px; 
+            font-size: 0.86rem; vertical-align: middle; line-height: 1.45;
+            border-bottom: 1px solid var(--line);
+            transition: background 0.15s var(--ease);
+        }
+        tbody tr:last-child td { border-bottom: none; }
+        tbody tr:hover td { background: var(--glass-bg-hover); }
+
+        /* Single-line cells get a clean ellipsis instead of wrapping to a
+           one-word-per-line column. Full text is on the title attribute. */
+        .td-clip { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .td-clip .dot-priority { flex: 0 0 auto; }
+
+        .td-task { vertical-align: top; font-weight: 600; color: var(--label); line-height: 1.4; overflow-wrap: break-word; }
+        .td-task .task-line {
+            display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+            overflow: hidden; word-break: normal;
+        }
+        .td-task .mailchain span {
+            flex: 1 1 auto; min-width: 0;
+            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+        }
+        .due-text { white-space: nowrap; font-weight: 600; font-family: var(--font-num); }
+        .td-empty { color: var(--label-3); }
+
+        .col-resize { position: absolute; top: 0; right: 0; width: 6px; bottom: 0; cursor: col-resize; transition: background 0.15s; }
+        .col-resize:hover, .col-resize.active { background: var(--accent); }
+
+        .dot-priority { display: inline-block; width: 9px; height: 9px; margin-right: 8px; border-radius: 50%; vertical-align: middle; }
+        .dot-High   { background: var(--red);   box-shadow: 0 0 7px var(--red); }
+        .dot-Medium { background: var(--amber);  box-shadow: 0 0 7px var(--amber); }
+        .dot-Low    { background: var(--green);  box-shadow: 0 0 7px var(--green); }
+
+        .status-pill {
+            display: inline-flex; align-items: center; padding: 4px 12px; font-size: 0.72rem; font-weight: 700;
+            border-radius: 20px; border: 1px solid transparent; letter-spacing: 0.02em;
+            white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+        }
+        .status-pill.Completed  { color: var(--green-ink); background: rgba(52,199,89,0.12); border-color: rgba(52,199,89,0.25); }
+        .status-pill.Pending    { color: var(--amber-ink); background: rgba(255,149,0,0.10); border-color: rgba(255,149,0,0.22); }
+        .status-pill.In-Progress{ color: var(--blue-ink);  background: rgba(0,122,255,0.10); border-color: rgba(0,122,255,0.22); }
+
+        /* ── ACTION ICONS ────────────────────────────────────────── */
+        .action-cell { white-space: nowrap; }
+        .action-cell .btn-icon { vertical-align: middle; }
+        .action-cell .btn-icon + .btn-icon { margin-left: 6px; }
+        .btn-icon {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 32px; height: 32px; border-radius: 9px; font-size: 1.1rem;
+            color: var(--label-2); background: var(--fill);
+            border: 1px solid var(--glass-border-subtle);
+            cursor: pointer; transition: all 0.15s var(--ease);
+        }
+        .btn-icon svg { width: 16px; height: 16px; stroke-width: 2.2; }
+        .btn-icon:hover { background: var(--glass-bg); color: var(--label); border-color: var(--glass-border); transform: translateY(-1px); box-shadow: var(--glass-shadow-sm); }
+        .btn-icon:active { transform: scale(0.92); }
+        .btn-icon.go:hover   { color: var(--blue-ink);  border-color: rgba(0,122,255,0.3);   background: rgba(0,122,255,0.08); }
+        .btn-icon.ok:hover   { color: var(--green-ink); border-color: rgba(52,199,89,0.3);   background: rgba(52,199,89,0.08); }
+        .btn-icon.warn:hover { color: var(--amber-ink); border-color: rgba(255,149,0,0.3);   background: rgba(255,149,0,0.08); }
+        .btn-icon.bad:hover  { color: var(--red-ink);   border-color: rgba(255,59,48,0.3);   background: rgba(255,59,48,0.08); }
+
+        .rec-badge { display: inline-block; margin-left: 8px; padding: 2px 8px; font-size: 0.75rem; font-weight: 700; color: var(--violet-ink); background: rgba(175,82,222,0.10); border-radius: 10px; }
+        .mailchain { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 0.82rem; color: var(--blue-ink); font-weight: 500; }
+        .btn-copy {
+            flex: 0 0 auto; display: inline-grid; place-items: center;
+            width: 26px; height: 26px; padding: 0; border-radius: 8px;
+            color: var(--blue-ink); background: rgba(0,122,255,0.08);
+            border: 1px solid rgba(0,122,255,0.18); cursor: pointer;
+            transition: all 0.15s var(--ease);
+        }
+        .btn-copy:hover { background: rgba(0,122,255,0.16); }
+        .btn-copy svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+        .btn-copy.done { color: var(--green-ink); background: rgba(52,199,89,0.14); border-color: var(--green); }
+        .due-flag { color: var(--red-ink); font-weight: 800; }
+        .due-time { font-weight: 600; color: var(--label-2); }
+
+        /* ── MOBILE CARDS ────────────────────────────────────────── */
+        .card-list { display: flex; flex-direction: column; gap: 12px; }
+        .tcard {
+            position: relative; padding: 12px 16px 12px 18px; border-radius: 16px;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            box-shadow: var(--glass-shadow-sm), var(--glass-inset);
+            transition: all 0.2s var(--ease);
+            backdrop-filter: saturate(180%) blur(28px); -webkit-backdrop-filter: saturate(180%) blur(28px);
+        }
+        .tcard::before {
+            content: ''; position: absolute; left: 0; top: 10px; bottom: 10px; width: 4px;
+            border-radius: 0 4px 4px 0; background: var(--slate);
+        }
+        .tcard[data-priority="High"]::before   { background: var(--red);   box-shadow: 0 0 10px var(--red); }
+        .tcard[data-priority="Medium"]::before { background: var(--amber); }
+        .tcard[data-priority="Low"]::before    { background: var(--green); }
+        .tcard.is-overdue { background: rgba(255,59,48,0.05); border-color: rgba(255,59,48,0.22); }
+
+        .tcard-title { font-size: 0.98rem; font-weight: 700; line-height: 1.3; color: var(--label); }
+        .tcard-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+        .tcard-row .tcard-title { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+        .tcard-row .status-pill { flex: 0 0 auto; white-space: nowrap; }
+        .tcard-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+        .chip {
+            display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px;
+            font-size: 0.76rem; font-weight: 600; border-radius: 20px; color: var(--label-2);
+            background: var(--fill); border: 1px solid var(--glass-border-subtle);
+        }
+        .chip.cat  { color: var(--blue-ink);   background: rgba(0,122,255,0.07);   border-color: rgba(0,122,255,0.15); }
+        .chip.rec  { color: var(--violet-ink); background: rgba(175,82,222,0.07);  border-color: rgba(175,82,222,0.15); }
+        .chip.mail { color: var(--blue-ink); cursor: pointer; max-width: 100%; min-width: 0; }
+        .chip.mail svg { flex: 0 0 auto; width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2; }
+        .chip .chip-txt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        .tcard-foot {
+            display: flex; align-items: center; justify-content: space-between; gap: 12px;
+            margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--separator);
+        }
+        .tcard-due { font-size: 0.85rem; font-weight: 600; color: var(--label-2); font-family: var(--font-num); }
+        .tcard-due.overdue { color: var(--red-ink); font-weight: 800; }
+        .tcard-actions { display: flex; gap: 4px; }
+
+        /* Chips and the date/actions share one line when there is room. */
+        .tcard-body { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; margin-top: 8px; }
+        .tcard-body .tcard-chips { flex: 1 1 260px; min-width: 0; margin-top: 0; }
+        .tcard-body .tcard-foot { flex: 0 0 auto; margin: 0 0 0 auto; padding: 0; border-top: 0; }
+        html[data-shell="mobile"] .tcard-body .tcard-foot { flex: 1 1 100%; margin-left: 0; padding-top: 8px; border-top: 1px solid var(--separator); }
+
+        .empty-state {
+            padding: 60px 20px; text-align: center; border-radius: 24px;
+            background: var(--glass-bg); border: 1px dashed var(--line-strong);
+        }
+        .empty-state strong { display: block; font-size: 1.1rem; font-weight: 800; margin-bottom: 6px; }
+        .empty-state span { font-size: 0.9rem; color: var(--label-2); font-weight: 500; }
+
+        /* ── MODALS ──────────────────────────────────────────────── */
+        .modal {
+            display: none; position: fixed; inset: 0; z-index: 1000; height: 100dvh;
+            padding: 24px; align-items: center; justify-content: center;
+            background: rgba(0, 0, 0, 0.35);
+            backdrop-filter: blur(20px) saturate(1.2);
+            -webkit-backdrop-filter: blur(20px) saturate(1.2);
+        }
+        .modal.open { display: flex; animation: modalFade 0.2s var(--ease) both; }
+        @keyframes modalFade { from { opacity: 0; } to { opacity: 1; } }
+
+        .modal-content {
+            position: relative; width: 100%; max-width: 600px; max-height: 90dvh; padding: 32px;
+            overflow-y: auto;
+            background: var(--glass-modal-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 30px;
+            box-shadow: 0 32px 80px rgba(0,0,0,0.22), var(--glass-inset);
+            animation: modalPop 0.3s var(--ease-spring) both;
+        }
+        @keyframes modalPop { from { opacity: 0; transform: scale(0.94) translateY(20px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+        .modal-sm { max-width: 480px; }
+        
+        .modal-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 24px; }
+        .modal-header h2 { font-size: 1.3rem; font-weight: 800; letter-spacing: -0.02em; }
+        .modal-close {
+            width: 36px; height: 36px; display: grid; place-items: center; font-size: 1rem;
+            color: var(--label-2); background: var(--fill);
+            border: 1px solid var(--glass-border-subtle); border-radius: 50%; cursor: pointer; transition: all 0.2s var(--ease);
+        }
+        .modal-close:hover { color: var(--label); background: var(--fill-2); }
+        
+        .form-group { margin-bottom: 20px; }
+        .form-group label {
+            display: flex; align-items: center; margin-bottom: 8px;
+            font-size: 0.78rem; font-weight: 700; color: var(--label-2); letter-spacing: 0.05em; text-transform: uppercase;
+        }
+        .form-group input, .form-group textarea, .form-group select {
+            width: 100%; padding: 14px 16px; font-size: 0.95rem; color: var(--label); font-weight: 500;
+            background: var(--input-bg); border: 1px solid var(--glass-border); border-radius: 14px;
+            outline: none; transition: all 0.2s var(--ease);
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+        }
+        .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
+        }
+        .form-group textarea { min-height: 100px; resize: vertical; line-height: 1.5; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+        .modal-buttons { display: flex; gap: 12px; margin-top: 32px; }
+        .btn-modal {
+            flex: 1; height: 48px; display: inline-flex; align-items: center; justify-content: center;
+            font-size: 0.95rem; font-weight: 700; border-radius: 16px; cursor: pointer; transition: all 0.2s var(--ease); border: none;
+        }
+        .btn-modal.primary { color: #fff; background: var(--accent); box-shadow: 0 8px 22px color-mix(in srgb, var(--accent) 40%, transparent), inset 0 1px 0 rgba(255,255,255,0.2); }
+        .btn-modal.primary:hover { transform: translateY(-2px); box-shadow: 0 14px 28px color-mix(in srgb, var(--accent) 45%, transparent); }
+        .btn-modal.secondary { color: var(--label); background: var(--fill); border: 1px solid var(--glass-border); }
+        .btn-modal.secondary:hover { background: var(--fill-2); }
+        .btn-modal.danger { color: var(--red-ink); background: rgba(255,59,48,0.08); border: 1px solid rgba(255,59,48,0.2); }
+        .btn-modal.danger:hover { background: rgba(255,59,48,0.14); }
+
+        /* List manager */
+        #listManagerItems { background: var(--fill); border: 1px solid var(--line); border-radius: 16px; padding: 4px 6px; max-height: 260px; overflow-y: auto; }
+        .lm-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 8px 8px 10px; border-bottom: 1px solid var(--separator); }
+        .lm-item:last-child { border-bottom: 0; }
+        .lm-name { flex: 1 1 auto; min-width: 0; font-size: 0.9rem; font-weight: 500; color: var(--label); overflow-wrap: anywhere; }
+        .lm-del {
+            flex: 0 0 auto; width: 76px; padding: 6px 0; cursor: pointer;
+            font-size: 0.8rem; font-weight: 700; color: var(--red-ink);
+            background: rgba(255,59,48,0.08); border: 1px solid rgba(255,59,48,0.2); border-radius: 10px;
+        }
+        .lm-del:hover { background: rgba(255,59,48,0.14); }
+        .add-row { display: flex; align-items: stretch; gap: 10px; margin-top: 12px; }
+        .add-row input {
+            flex: 1 1 auto; min-width: 0; height: 46px; padding: 0 14px; font-size: 0.92rem; font-weight: 500;
+            border: 1px solid var(--line-strong); border-radius: 14px; background: var(--input-bg); color: var(--label); outline: none;
+        }
+        .add-row input:focus { border-color: var(--accent); }
+        .add-row .btn-modal { flex: 0 0 88px; width: 88px; height: 46px; }
+        .lm-foot { display: flex; gap: 10px; margin-top: 16px; }
+        html[data-shell="mobile"] .lm-foot { flex-direction: column; }
+        html[data-shell="mobile"] .lm-foot .btn-modal,
+        html[data-shell="mobile"] .modal-buttons .btn-modal { flex: 0 0 auto; }
+        html[data-shell="mobile"] .add-row .btn-modal { flex: 0 0 88px; width: 88px; }
+
+        /* ── CONFIG PANEL ────────────────────────────────────────── */
+        .sheet-stats { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
+        .sheet-stat {
+            text-align: center; flex: 1; padding: 14px 12px; border-radius: 18px;
+            background: var(--glass-bg); border: 1px solid var(--glass-border);
+            box-shadow: var(--glass-shadow-sm), var(--glass-inset);
+            backdrop-filter: saturate(180%) blur(28px); -webkit-backdrop-filter: saturate(180%) blur(28px);
+        }
+        .sheet-stat b { display: block; font-size: 1.5rem; font-weight: 800; color: var(--accent); letter-spacing: -0.03em; }
+        .sheet-stat span { font-size: 0.72rem; color: var(--label-2); text-transform: uppercase; font-weight: 700; letter-spacing: 0.04em; }
+
+        .cfg-section {
+            margin-bottom: 16px; padding: 18px; border-radius: 20px;
+            background: var(--glass-bg); border: 1px solid var(--glass-border);
+            box-shadow: var(--glass-shadow-sm), var(--glass-inset);
+        }
+        .dash-title { margin-bottom: 12px; font-size: 1rem; font-weight: 800; color: var(--label); }
+        .sheet-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+        .sheet-item {
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+            padding: 14px 8px; font-size: 0.8rem; font-weight: 700; color: var(--label);
+            background: var(--fill);
+            border: 1px solid var(--glass-border-subtle); border-radius: 14px;
+            cursor: pointer; transition: all 0.2s var(--ease);
+        }
+        .sheet-item:hover { background: var(--glass-bg); transform: translateY(-3px); box-shadow: var(--glass-shadow-sm); border-color: var(--accent); }
+        .sheet-item .ico { font-size: 1.2rem; }
+
+        .walk-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; }
+        .walk-row .sheet-item { flex: 0 0 auto; min-width: 140px; height: 68px; }
+        .walk-toggle.is-off { opacity: 0.5; }
+        .walk-field { display: flex; flex-direction: column; gap: 6px; font-size: 0.76rem; font-weight: 700; color: var(--label-2); }
+        .walk-field input {
+            height: 44px; padding: 0 12px; font-size: 0.9rem; font-weight: 600; color: var(--label);
+            background: var(--input-bg); border: 1px solid var(--line-strong); border-radius: 12px; outline: none;
+        }
+        .walk-field input:focus { border-color: var(--accent); }
+        .walk-field input[type="number"] { width: 110px; }
+        html[data-shell="mobile"] .walk-row .sheet-item, html[data-shell="mobile"] .walk-field { flex: 1 1 140px; }
+        html[data-shell="mobile"] .walk-field input { width: 100%; }
+
+        .walk-card {
+            padding: 14px 16px; border-radius: 16px;
+            background: rgba(52,199,89,0.09); border: 1px solid rgba(52,199,89,0.25);
+        }
+        .walk-card-time { font-size: 1rem; font-weight: 800; color: var(--green-ink); font-family: var(--font-num); }
+        .walk-card-sub { margin-top: 4px; font-size: 0.8rem; font-weight: 600; color: var(--label-2); }
+
+        .cfg-hint { margin: -4px 0 12px; font-size: 0.82rem; font-weight: 500; color: var(--label-2); line-height: 1.5; }
+        .sound-list { display: flex; flex-direction: column; gap: 8px; }
+        .sound-row {
+            display: flex; align-items: center; gap: 12px; padding: 12px 14px;
+            background: var(--fill); border: 1px solid var(--glass-border-subtle); border-radius: 14px;
+            cursor: pointer; transition: all 0.2s var(--ease);
+        }
+        .sound-row:hover { background: var(--glass-bg); border-color: var(--accent); }
+        .sound-row.is-on { background: var(--glass-bg); border-color: var(--accent); box-shadow: var(--glass-shadow-sm); }
+        .sound-dot {
+            flex: 0 0 auto; width: 18px; height: 18px; border-radius: 50%;
+            border: 2px solid var(--line-strong); background: transparent;
+        }
+        .sound-row.is-on .sound-dot { border-color: var(--accent); background: var(--accent); box-shadow: inset 0 0 0 3px var(--glass-bg); }
+        .sound-name { flex: 1 1 auto; font-size: 0.9rem; font-weight: 700; color: var(--label); }
+        .sound-row.is-on .sound-name { color: var(--accent); }
+        .sound-play {
+            flex: 0 0 auto; display: inline-grid; place-items: center;
+            width: 34px; height: 34px; border-radius: 50%; border: none;
+            background: var(--fill-2); color: var(--accent); cursor: pointer;
+        }
+        .sound-play svg { width: 15px; height: 15px; }
+        .sound-play:hover { background: var(--glass-bg); }
+
+        
+        .theme-row { display: flex; gap: 10px; padding: 6px; background: var(--fill); border-radius: 16px; border: 1px solid var(--glass-border-subtle); flex-wrap: wrap; }
+        .theme-btn { flex: 1; min-width: 100px; height: 38px; border: none; background: transparent; border-radius: 12px; font-size: 0.85rem; font-weight: 600; color: var(--label-2); cursor: pointer; transition: all 0.2s var(--ease); }
+        .theme-btn.on { background: var(--glass-bg); color: var(--accent); font-weight: 700; box-shadow: var(--glass-shadow-sm), var(--glass-inset); }
+
+        /* ── TOASTS ──────────────────────────────────────────────── */
+        #toastContainer {
+            position: fixed; top: calc(var(--appbar-h) + 14px); left: 50%; transform: translateX(-50%);
+            z-index: 20000; width: min(520px, calc(100vw - 32px));
+            display: flex; flex-direction: column; align-items: center; gap: 10px; pointer-events: none;
+        }
+        .toast {
+            pointer-events: auto; min-width: 240px; padding: 14px 20px; text-align: left;
+            font-size: 0.9rem; font-weight: 600; color: #fff; background: var(--label);
+            border-radius: 16px;
+            box-shadow: 0 12px 32px rgba(0,0,0,0.18);
+            animation: toastIn 0.3s var(--ease-spring) both;
+            backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+        }
+        .toast.success { background: var(--green-ink); }
+        .toast.error   { background: var(--red-ink); }
+        .toast.warning { background: var(--amber-ink); }
+        .toast.info    { background: var(--blue-ink); }
+        @keyframes toastIn { from { opacity: 0; transform: translateY(-14px) scale(0.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+        /* ── LAYOUT HELPERS ──────────────────────────────────────── */
+        body > .content-area { width: 100%; max-width: none; margin-left: 0; margin-right: 0; }
+        body > .content-area > * { max-width: none; margin-left: 0; margin-right: 0; }
+        body > #dashboardTab { padding: 24px var(--gutter) 48px; }
+
+        /* ── TABLE / CARD VIEW SWITCH ────────────────────────────── */
+        /* These win over the width-based media queries below, so the choice
+           works on a phone asking for the desktop site and on a narrow
+           desktop window alike. */
+        body[data-view="cards"] .card-list { display: flex !important; }
+        body[data-view="cards"] .table-wrap:not(.always) { display: none !important; }
+        body[data-view="table"] .card-list { display: none !important; }
+        body[data-view="table"] .table-wrap { display: block !important; }
+
+        .view-toggle { font-size: 0.95rem; line-height: 1; }
+
+        /* ── SWIPE ACTIONS ON CARDS ──────────────────────────────── */
+        .card-list .tcard { touch-action: pan-y; will-change: transform; }
+        .tcard.swipe-done { border-color: var(--green); box-shadow: 0 0 0 2px rgba(52,199,89,0.22); }
+        .tcard.swipe-bin  { border-color: var(--red);   box-shadow: 0 0 0 2px rgba(255,59,48,0.22); }
+        .swipe-hint { margin: 0 0 10px; font-size: 0.78rem; font-weight: 600; color: var(--label-3); text-align: center; }
+        body[data-view="table"] .swipe-hint { display: none; }
+        @media (hover: hover) and (pointer: fine) { .swipe-hint { display: none; } }
+
+        /* ── TOAST ACTION (undo) ─────────────────────────────────── */
+        .toast { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+        .toast-action {
+            flex: 0 0 auto; padding: 5px 12px; border-radius: 10px; cursor: pointer;
+            font-size: 0.78rem; font-weight: 800; letter-spacing: 0.02em;
+            color: var(--accent); background: rgba(0,122,255,0.10);
+            border: 1px solid rgba(0,122,255,0.26);
+        }
+        .toast-action:hover { background: rgba(0,122,255,0.2); }
+
+        /* ── BANK-HOLIDAY HINT ON THE DUE DATE ───────────────────── */
+        .due-hint {
+            display: none; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 10px;
+            padding: 10px 12px; border-radius: 12px; font-size: 0.82rem; font-weight: 600;
+            color: var(--amber-ink); background: rgba(255,149,0,0.10); border: 1px solid rgba(255,149,0,0.24);
+        }
+        .due-hint.ok { color: var(--green-ink); background: rgba(52,199,89,0.10); border-color: rgba(52,199,89,0.24); }
+        .due-hint.clash { color: var(--red-ink); background: rgba(255,59,48,0.10); border-color: rgba(255,59,48,0.24); }
+        .due-hint button {
+            padding: 5px 11px; border-radius: 9px; cursor: pointer; font-size: 0.78rem; font-weight: 800;
+            color: var(--blue-ink); background: rgba(0,122,255,0.10); border: 1px solid rgba(0,122,255,0.24);
+        }
+
+        /* ── BULK SELECT ─────────────────────────────────────────── */
+        body.selecting tbody tr[data-record-id] td,
+        body.selecting .card-list .tcard[data-record-id] { cursor: pointer; }
+        tr.is-selected td { background: rgba(0,122,255,0.13) !important; }
+        .tcard.is-selected { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(0,122,255,0.26); }
+        body.selecting .card-list .tcard[data-record-id]::after {
+            content: ''; position: absolute; right: 16px; top: 16px; width: 20px; height: 20px;
+            border-radius: 50%; border: 2px solid var(--line-strong); background: var(--input-bg);
+        }
+        body.selecting .card-list .tcard.is-selected::after {
+            background: var(--accent); border-color: var(--accent);
+            box-shadow: inset 0 0 0 3px var(--input-bg);
+        }
+        .btn-icon.is-on { color: #fff; background: var(--accent); border-color: var(--accent); }
+
+        #bulkBar {
+            display: none; position: fixed; z-index: 950;
+            left: 50%; transform: translateX(-50%);
+            bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+            align-items: center; gap: 10px; padding: 10px 12px 10px 18px;
+            border-radius: 22px; max-width: calc(100vw - 24px); flex-wrap: wrap;
+            background: var(--glass-header-bg); border: 1px solid var(--glass-border);
+            box-shadow: 0 20px 48px rgba(0,0,0,0.18), var(--glass-inset);
+            backdrop-filter: saturate(180%) blur(28px); -webkit-backdrop-filter: saturate(180%) blur(28px);
+        }
+        #bulkBar.open { display: flex; }
+        #bulkCount { font-size: 0.86rem; font-weight: 800; color: var(--label); white-space: nowrap; }
+        #bulkBar button {
+            padding: 8px 14px; border-radius: 13px; cursor: pointer; white-space: nowrap;
+            font-size: 0.82rem; font-weight: 700; border: 1px solid var(--line-strong);
+            background: var(--glass-bg); color: var(--label);
+        }
+        #bulkBar button.ok   { color: var(--green-ink); border-color: rgba(52,199,89,0.3);  background: rgba(52,199,89,0.12); }
+        #bulkBar button.bad  { color: var(--red-ink);   border-color: rgba(255,59,48,0.3);  background: rgba(255,59,48,0.10); }
+        #bulkBar button.warn { color: var(--amber-ink); border-color: rgba(255,149,0,0.3);  background: rgba(255,149,0,0.10); }
+
+        html[data-shell="mobile"] #bulkBar { bottom: calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom, 0px)); }
+
+        /* ── COMPACT DASHBOARD TILES ─────────────────────────────── */
+        .stat-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+            gap: 10px; margin-bottom: 22px;
+        }
+        .stat-tile {
+            position: relative; display: flex; flex-direction: column; align-items: flex-start;
+            gap: 2px; padding: 14px 14px 13px 16px; text-align: left; cursor: pointer;
+            border-radius: 16px; overflow: hidden;
+            background: var(--glass-bg); border: 1px solid var(--glass-border);
+            box-shadow: var(--glass-shadow-sm), var(--glass-inset);
+            transition: transform 0.18s var(--ease), box-shadow 0.18s var(--ease);
+        }
+        .stat-tile::before {
+            content: ''; position: absolute; left: 0; top: 12px; bottom: 12px;
+            width: 3px; border-radius: 0 3px 3px 0; background: var(--tint, var(--slate));
+        }
+        .stat-tile:hover { transform: translateY(-2px); box-shadow: var(--glass-shadow), var(--glass-inset); }
+        .stat-tile:active { transform: scale(0.97); }
+        .stat-num {
+            font-size: 1.6rem; font-weight: 800; line-height: 1.1;
+            color: var(--tint, var(--label)); font-family: var(--font-num); letter-spacing: -0.02em;
+        }
+        .stat-label { font-size: 0.8rem; font-weight: 700; color: var(--label); }
+        .stat-sub { font-size: 0.7rem; font-weight: 600; color: var(--label-3); }
+
+        .dash-section { margin-bottom: 20px; }
+        .dash-section h3 {
+            display: flex; align-items: baseline; gap: 8px; margin: 0 0 10px;
+            font-size: 0.78rem; font-weight: 800; letter-spacing: 0.06em;
+            text-transform: uppercase; color: var(--label-2);
+        }
+        .dash-section h3 b { font-size: 0.72rem; font-weight: 700; color: var(--label-3); letter-spacing: 0; }
+
+        .mini-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(146px, 1fr)); gap: 8px; }
+        .mini-tile {
+            display: flex; align-items: center; justify-content: space-between; gap: 8px;
+            padding: 10px 12px; cursor: pointer; text-align: left;
+            border-radius: 13px; background: var(--glass-bg);
+            border: 1px solid var(--glass-border-subtle);
+            box-shadow: var(--glass-shadow-sm);
+            transition: transform 0.15s var(--ease), border-color 0.15s var(--ease);
+        }
+        .mini-tile:hover { transform: translateY(-1px); border-color: var(--tint, var(--line-strong)); }
+        .mini-tile:active { transform: scale(0.97); }
+        .mini-tile.is-static { cursor: default; }
+        .mini-tile.is-static:hover { transform: none; }
+        .mini-name {
+            min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+            font-size: 0.8rem; font-weight: 600; color: var(--label);
+        }
+        .mini-num {
+            flex: 0 0 auto; min-width: 24px; padding: 2px 7px; text-align: center;
+            font-size: 0.78rem; font-weight: 800; font-family: var(--font-num);
+            color: var(--tint, var(--label-2)); background: var(--fill); border-radius: 8px;
+        }
+        .dash-none { font-size: 0.8rem; font-weight: 600; color: var(--label-3); padding: 2px 0 6px; }
+
+        /* ── CONTINUOUS HOLIDAY BANNER (Holidays tab only) ───────── */
+        .cont-hol-wrap { display: flex; flex-direction: column; gap: 8px; margin: 2px 0 18px; }
+        .cont-hol-card {
+            display: flex; align-items: center; gap: 12px; padding: 12px 16px;
+            border-radius: 16px; background: linear-gradient(135deg, rgba(255,149,0,0.14), rgba(255,149,0,0.05));
+            border: 1px solid rgba(255,149,0,0.28); box-shadow: var(--glass-shadow-sm);
+        }
+        .cont-hol-ico { flex: 0 0 auto; font-size: 1.3rem; line-height: 1; }
+        .cont-hol-body { min-width: 0; }
+        .cont-hol-title { font-size: 0.85rem; font-weight: 800; color: var(--amber-ink); }
+        .cont-hol-sub { font-size: 0.76rem; font-weight: 600; color: var(--label-2); margin-top: 1px; }
+
+        /* ── HOLIDAY CARD (card-list view) ───────────────────────── */
+        .hol-bell {
+            flex: 0 0 auto; width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center;
+            border-radius: 50%; border: 1px solid var(--glass-border-subtle); background: var(--fill);
+            color: var(--label-3); cursor: pointer; font-size: 0.85rem; transition: all 0.15s var(--ease);
+        }
+        .hol-bell.on { color: var(--accent); background: rgba(0,122,255,0.1); border-color: rgba(0,122,255,0.25); }
+        .hol-bell:active { transform: scale(0.9); }
+        .chip.hol-usd { color: var(--blue-ink); background: rgba(0,122,255,0.08); border-color: rgba(0,122,255,0.18); }
+        .chip.hol-ind { color: var(--amber-ink); background: rgba(255,149,0,0.08); border-color: rgba(255,149,0,0.18); }
+        .chip.hol-other { color: var(--violet-ink); background: rgba(175,82,222,0.08); border-color: rgba(175,82,222,0.18); }
+
+        @media (max-width: 420px) {
+            .stat-grid { grid-template-columns: repeat(2, 1fr); }
+            .mini-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        /* The card list and table are switched by body[data-view] above. */
+        .card-list { display: none; }
+
+        /* ── MOBILE SHELL ─────────────────────────────────────────
+           Tabs move to a floating bar at the bottom, panels become
+           sheets, toasts drop to the top. Switched on by the
+           data-shell attribute, which app.js sets from the device
+           (width plus pointer type), so this is independent of the
+           table/card toggle and survives "desktop site" mode. */
+        @keyframes sheetSlideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        html[data-shell="mobile"] .table-wrap:not(.always) { display: none; }
+        html[data-shell="mobile"] .table-wrap.always .table-container { max-height: 62vh; }
+        html[data-shell="mobile"] .appbar { padding: 0 16px; }
+        html[data-shell="mobile"] .appbar-title { font-size: 1.05rem; }
+        html[data-shell="mobile"] .tabbar {
+        order: 0; position: fixed; top: auto; left: 16px; right: 16px; transform: none;
+        bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+        z-index: 90; margin: 0; height: var(--tabbar-h); padding: 6px;
+        background: var(--glass-header-bg);
+        border: 1px solid var(--glass-border);
+        border-radius: 26px;
+        box-shadow: 0 20px 48px rgba(0,0,0,0.14), var(--glass-inset);
+        }
+        html[data-shell="mobile"] .tabbar-btn { flex: 1 1 0; flex-direction: column; gap: 4px; height: 100%; padding: 4px 2px; font-size: 0.7rem; border-radius: 18px; }
+        html[data-shell="mobile"] .tabbar-btn.active { background: var(--fill); box-shadow: none; }
+        html[data-shell="mobile"] .tabbar-ico { display: block; width: 24px; height: 24px; }
+        html[data-shell="mobile"] .tabbar-ico svg { width: 100%; height: 100%; stroke-width: 2; }
+        html[data-shell="mobile"] .tabbar-lbl { font-size: 0.7rem; font-weight: 600; line-height: 1; }
+        html[data-shell="mobile"] .tabbar-btn .badge { position: absolute; top: 2px; right: 6px; left: auto; transform: none; min-width: 16px; height: 16px; line-height: 16px; font-size: 0.6rem; padding: 0 4px; }
+        html[data-shell="mobile"] .content-area { padding: 16px 16px calc(var(--tabbar-h) + 48px + env(safe-area-inset-bottom, 0px)); }
+        html[data-shell="mobile"] #registerTab, html[data-shell="mobile"] #completedTab, html[data-shell="mobile"] #binTab, html[data-shell="mobile"] #holidaysTab { --gutter: 16px; padding: 16px 16px calc(var(--tabbar-h) + 48px + env(safe-area-inset-bottom, 0px)); }
+        html[data-shell="mobile"] body > #dashboardTab { --gutter: 16px; padding: 16px 16px calc(var(--tabbar-h) + 48px + env(safe-area-inset-bottom, 0px)); }
+        html[data-shell="mobile"] .dash-controls { gap: 10px; }
+        html[data-shell="mobile"] .dash-controls .filter-select { flex: 1 1 100%; }
+        html[data-shell="mobile"] .dash-controls > span { margin-left: 0; }
+
+        /* Mobile bottom bar shows only Dashboard / Tasks / More — the rest
+           move into the popup below. Desktop keeps all six inline as before
+           and never shows the More button. */
+        html[data-shell="mobile"] .tabbar-btn[data-tab="Completed"],
+        html[data-shell="mobile"] .tabbar-btn[data-tab="Holidays"],
+        html[data-shell="mobile"] .tabbar-btn[data-tab="Bin"],
+        html[data-shell="mobile"] .tabbar-btn[data-tab="Config"] { display: none; }
+        html:not([data-shell="mobile"]) .more-tab-btn,
+        html:not([data-shell="mobile"]) .more-menu,
+        html:not([data-shell="mobile"]) .more-menu-backdrop { display: none; }
+
+        .more-menu-backdrop {
+            display: none; position: fixed; inset: 0; z-index: 92; background: rgba(0,0,0,0.15);
+        }
+        .more-menu-backdrop.open { display: block; }
+        .more-menu {
+            position: fixed; right: 16px; z-index: 93;
+            bottom: calc(var(--tabbar-h) + 32px + env(safe-area-inset-bottom, 0px));
+            display: flex; flex-direction: column-reverse; gap: 10px;
+        }
+        .more-menu-item {
+            pointer-events: none; opacity: 0; transform: translateY(10px) scale(0.92);
+            display: flex; align-items: center; gap: 10px; padding: 11px 18px 11px 14px;
+            background: var(--glass-header-bg); border: 1px solid var(--glass-border);
+            border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.16), var(--glass-inset);
+            backdrop-filter: saturate(180%) blur(28px); -webkit-backdrop-filter: saturate(180%) blur(28px);
+            font-size: 0.86rem; font-weight: 700; color: var(--label); white-space: nowrap;
+            transition: opacity 0.18s var(--ease), transform 0.18s var(--ease);
+        }
+        .more-menu.open .more-menu-item { pointer-events: auto; opacity: 1; transform: translateY(0) scale(1); }
+        /* Nearest item to the More button (Done) appears first, then the
+           rest unstack upward one by one. */
+        .more-menu.open .more-menu-item:nth-child(1) { transition-delay: 0s; }
+        .more-menu.open .more-menu-item:nth-child(2) { transition-delay: 0.05s; }
+        .more-menu.open .more-menu-item:nth-child(3) { transition-delay: 0.10s; }
+        .more-menu.open .more-menu-item:nth-child(4) { transition-delay: 0.15s; }
+        .more-menu-item .more-ico { width: 20px; height: 20px; flex-shrink: 0; display: flex; }
+        .more-menu-item .more-ico svg { width: 100%; height: 100%; stroke-width: 2; }
+        .more-menu-item .badge { margin-left: 2px; }
+        .more-menu-item.active { border-color: var(--accent); color: var(--accent); }
+        .tabbar-btn.more-tab-btn.active { background: var(--fill); }
+
+        /* Config tab — cleaner fixed grids instead of flex-wrap, which
+           squeezed the theme buttons together on narrow screens — and
+           overall smaller/tighter cards to fit more on one screen. */
+        html[data-shell="mobile"] .theme-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; padding: 6px; }
+        html[data-shell="mobile"] .theme-btn { flex: none; min-width: 0; width: 100%; height: 40px; font-size: 0.78rem; }
+        html[data-shell="mobile"] .sheet-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+        html[data-shell="mobile"] .sheet-stats { gap: 8px; margin-bottom: 14px; }
+        html[data-shell="mobile"] .sheet-stat { padding: 10px 6px; border-radius: 14px; }
+        html[data-shell="mobile"] .sheet-stat b { font-size: 1.25rem; }
+        html[data-shell="mobile"] .cfg-section { padding: 12px; margin-bottom: 10px; border-radius: 16px; }
+        html[data-shell="mobile"] .dash-title { font-size: 0.88rem; margin-bottom: 8px; }
+        html[data-shell="mobile"] .sheet-item { padding: 10px 6px; font-size: 0.74rem; gap: 4px; border-radius: 12px; }
+        html[data-shell="mobile"] .sheet-item .ico { font-size: 1.05rem; }
+        html[data-shell="mobile"] .cfg-hint { font-size: 0.76rem; margin: -2px 0 8px; }
+        html[data-shell="mobile"] .sound-list { gap: 6px; }
+        html[data-shell="mobile"] .walk-row .sheet-item { min-width: 120px; height: 58px; }
+        html[data-shell="mobile"] .toolbar-row { margin-top: -16px; }
+        html[data-shell="mobile"] .table-container { max-height: unset; }
+        html[data-shell="mobile"] .multi-select, html[data-shell="mobile"] .ms-header, html[data-shell="mobile"] .filter-select { width: 100%; max-width: 100%; }
+        /* Toolbar (search + filters) on mobile: search gets its own full-width
+           row, the filters below it sit in a fixed 3-per-row grid instead of
+           each stacking on its own full-width line, and the icon buttons
+           stay together on one single row (scrollable if it's ever tight)
+           instead of wrapping onto a second line. Shared by Tasks, Completed,
+           Bin and Holidays. */
+        html[data-shell="mobile"] .single-line-toolbar { flex-wrap: wrap; overflow-x: visible; gap: 8px; align-items: stretch; }
+        html[data-shell="mobile"] .search-compact { flex: 1 1 100%; order: 1; }
+        html[data-shell="mobile"] .toolbar-filters {
+            order: 2; width: 100%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+        }
+        html[data-shell="mobile"] .toolbar-filters .multi-select,
+        html[data-shell="mobile"] .toolbar-filters .filter-select { width: 100%; min-width: 0; }
+        html[data-shell="mobile"] .toolbar-actions {
+            order: 3; width: 100%; flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start;
+            margin-left: 0; padding-bottom: 2px; -webkit-overflow-scrolling: touch;
+        }
+        html[data-shell="mobile"] .toolbar-actions::-webkit-scrollbar { display: none; }
+        html[data-shell="mobile"] .toolbar-actions > * { flex: 0 0 auto; }
+        html[data-shell="mobile"] .modal { align-items: flex-end; padding: 0; }
+        html[data-shell="mobile"] .modal-content { max-width: 100%; max-height: 85dvh; border-radius: 32px 32px 0 0; padding: 24px 24px calc(32px + env(safe-area-inset-bottom, 0px)); animation: sheetSlideUp 0.3s var(--ease-spring) both; }
+        html[data-shell="mobile"] .modal-header::before { content: ''; position: absolute; top: 10px; left: 50%; transform: translateX(-50%); width: 40px; height: 5px; border-radius: 4px; background: var(--line-strong); }
+        html[data-shell="mobile"] .form-row { grid-template-columns: 1fr; gap: 12px; }
+        html[data-shell="mobile"] .modal-buttons { flex-direction: column; }
+        html[data-shell="mobile"] .btn-modal { width: 100%; }
+        html[data-shell="mobile"] #toastContainer {
+        top: auto; left: 50%; transform: translateX(-50%);
+        bottom: calc(var(--tabbar-h) + 32px + env(safe-area-inset-bottom, 0px));
+        width: auto; max-width: calc(100vw - 56px); align-items: center;
+        }
+        html[data-shell="mobile"] .toast {
+        text-align: center; min-width: 0; max-width: 100%; justify-content: center;
+        padding: 9px 16px; font-size: 0.78rem; border-radius: 12px; gap: 8px;
+        animation: toastInUp 0.3s var(--ease-spring) both;
+        }
+        @keyframes toastInUp { from { opacity: 0; transform: translateY(14px) scale(0.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+
+        /* ── BOOT SPLASH ─────────────────────────────────────────── */
+        .boot {
+            position: fixed; inset: 0; z-index: 99999;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 22px; background: var(--canvas-bg); background-attachment: fixed;
+            padding: env(safe-area-inset-top, 0px) 24px env(safe-area-inset-bottom, 0px);
+            transition: opacity 0.55s var(--ease), transform 0.55s var(--ease), visibility 0s linear 0.55s;
+        }
+        .boot.gone { opacity: 0; transform: scale(1.08); visibility: hidden; pointer-events: none; }
+
+        .boot-tile {
+            width: 116px; height: 116px;
+            filter: drop-shadow(0 18px 38px rgba(13, 148, 136, 0.34));
+            animation: bootPop 0.78s var(--ease-spring) both;
+        }
+        .boot-tile svg { width: 100%; height: 100%; display: block; }
+
+        .boot-ring {
+            stroke-dasharray: 189; stroke-dashoffset: 189;
+            animation: bootDraw 1.05s var(--ease) 0.2s forwards;
+        }
+        .boot-tick {
+            stroke-dasharray: 46; stroke-dashoffset: 46;
+            animation: bootDraw 0.42s var(--ease) 0.82s forwards;
+        }
+        .boot-glow {
+            transform-origin: 50px 50px;
+            animation: bootHalo 1.9s var(--ease) 0.9s infinite;
+        }
+
+        .boot-name {
+            font-size: 1.12rem; font-weight: 800; letter-spacing: -0.02em; color: var(--label);
+            text-align: center; animation: bootRise 0.6s var(--ease) 0.42s both;
+        }
+        .boot-sub {
+            margin-top: -14px; font-size: 0.82rem; font-weight: 600; color: var(--label-2);
+            animation: bootRise 0.6s var(--ease) 0.56s both;
+        }
+        .boot-welcome {
+            display: none; max-width: 280px; margin-top: -10px;
+            font-size: 0.86rem; font-weight: 500; line-height: 1.5; text-align: center;
+            color: var(--label-2); animation: bootRise 0.6s var(--ease) 0.62s both;
+        }
+        html[data-shell="mobile"] .boot-welcome { display: block; }
+        .boot-welcome b { color: var(--label); font-weight: 700; }
+        .boot-bar {
+            width: 128px; height: 4px; border-radius: 2px; overflow: hidden;
+            background: var(--fill-2); animation: bootRise 0.6s var(--ease) 0.7s both;
+        }
+        .boot-bar i {
+            display: block; width: 42%; height: 100%; border-radius: 2px;
+            background: linear-gradient(90deg, #2dd4bf, #0d9488);
+            animation: bootSlide 1.15s var(--ease) infinite;
+        }
+
+        @keyframes bootPop {
+            0%   { opacity: 0; transform: scale(0.55) rotate(-9deg); }
+            60%  { opacity: 1; }
+            100% { opacity: 1; transform: scale(1) rotate(0deg); }
+        }
+        @keyframes bootDraw { to { stroke-dashoffset: 0; } }
+        @keyframes bootHalo {
+            0%   { opacity: 0.42; transform: scale(1); }
+            55%  { opacity: 0; transform: scale(1.35); }
+            100% { opacity: 0; transform: scale(1.35); }
+        }
+        @keyframes bootRise {
+            from { opacity: 0; transform: translateY(12px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes bootSlide {
+            0%   { transform: translateX(-110%); }
+            100% { transform: translateX(245%); }
+        }
+
+        /* The shell arriving behind the splash */
+        body.booted .appbar { animation: shellDrop 0.5s var(--ease) both; }
+        body.booted .tabbar { animation: shellRise 0.5s var(--ease) 0.06s both; }
+        body.booted .content-area.active { animation: shellFade 0.55s var(--ease) 0.1s both; }
+        body.booted #appMark { animation: markPulse 0.9s var(--ease-spring) 0.18s both; }
+
+        @keyframes shellDrop { from { opacity: 0; transform: translateY(-14px); } to { opacity: 1; transform: none; } }
+        @keyframes shellRise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+        @keyframes shellFade { from { opacity: 0; transform: translateY(10px) scale(0.995); } to { opacity: 1; transform: none; } }
+        @keyframes markPulse {
+            0%   { transform: scale(0.6); opacity: 0; }
+            55%  { transform: scale(1.14); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .boot-tile, .boot-name, .boot-sub, .boot-bar, .boot-bar i, .boot-glow,
+            body.booted .appbar, body.booted .tabbar,
+            body.booted .content-area.active, body.booted #appMark { animation: none !important; }
+            .boot-ring, .boot-tick { stroke-dashoffset: 0; animation: none !important; }
+            .boot { transition: opacity 0.2s linear, visibility 0s linear 0.2s; }
+            .boot.gone { transform: none; }
+        }
+
+        /* ── PRINT ───────────────────────────────────────────────── */
+        @media print {
+            .appbar, .filter-bar, .single-line-toolbar, .screen-head, .dash-controls, .modal, #toastContainer, .tabbar { display: none !important; }
+            .content-area { display: none !important; padding: 0 !important; }
+            .content-area.active { display: block !important; }
+            .table-wrap { display: block !important; border: none !important; box-shadow: none !important; }
+            .table-container { max-height: none !important; overflow: visible !important; }
+            table { width: 100% !important; border-collapse: collapse !important; }
+            th, td { font-size: 10pt !important; color: #000 !important; background: #fff !important; border: 1px solid #ccc !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Boot splash -->
+    <div class="boot" id="bootSplash" role="status" aria-label="Loading Banking Work Tracker">
+        <div class="boot-tile">
+            <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <defs>
+                    <linearGradient id="bootGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0" stop-color="#2dd4bf"/>
+                        <stop offset="1" stop-color="#0d9488"/>
+                    </linearGradient>
+                </defs>
+                <rect width="100" height="100" rx="23" fill="url(#bootGrad)"/>
+                <circle class="boot-glow" cx="50" cy="50" r="30" fill="none" stroke="#fff" stroke-width="4"/>
+                <circle cx="50" cy="50" r="30" fill="none" stroke="#fff" stroke-opacity="0.30" stroke-width="8"/>
+                <circle class="boot-ring" cx="50" cy="50" r="30" fill="none" stroke="#fff" stroke-width="8"
+                        stroke-linecap="round" transform="rotate(-90 50 50)"/>
+                <path class="boot-tick" d="M36 51l10 10 20-22" fill="none" stroke="#fff" stroke-width="7"
+                      stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </div>
+        <div class="boot-name">Banking Work Tracker</div>
+        <div class="boot-sub">PUR Energy</div>
+        <p class="boot-welcome"><b>Welcome back 👋</b><br>Tasks, deadlines &amp; bank holidays — all in one place.</p>
+        <div class="boot-bar"><i></i></div>
+    </div>
+
+    <script>
+        /* Safety net: if the app script ever fails to load, don't leave the
+           boot screen stuck over the page. */
+        setTimeout(function () {
+            var el = document.getElementById('bootSplash');
+            if (el && !el.classList.contains('gone')) {
+                el.classList.add('gone');
+                document.body.classList.add('booted');
+            }
+        }, 5000);
+    </script>
+
+    <!-- Header. tabbar is a SIBLING of the header, not nested inside it — the
+         header carries backdrop-filter, which (like transform) creates a
+         containing block for position:fixed descendants. Nesting the tabbar
+         inside it broke "fixed to the bottom of the screen" on mobile: it was
+         pinning to the bottom of the ~64px header box instead. -->
+    <div class="header-wrap" id="headerWrap">
+    <header class="appbar" id="mainAppHeader" style="display:none;">
+        <div class="appbar-left">
+            <span class="appbar-mark" id="appMark">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="9"/><path d="M8.5 12.3l2.4 2.4 4.6-5"/>
+                </svg>
+            </span>
+            <div class="appbar-titles">
+                <div class="appbar-title" id="screenTitle">Overview</div>
+                <div class="appbar-sub" id="headerDate">—</div>
+            </div>
+        </div>
+
+        <div class="appbar-right">
+            <div class="autosave" id="saveStatus"><span class="dot"></span> Saved</div>
+        </div>
+    </header>
+
+        <nav class="tabbar" id="tabBar" style="display:none;">
+            <button class="tabbar-btn active" data-tab="Dashboard" onclick="app.switchTab('Dashboard')">
+                <span class="tabbar-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="9" rx="2"/><rect x="14" y="3" width="7" height="5" rx="2"/><rect x="14" y="12" width="7" height="9" rx="2"/><rect x="3" y="16" width="7" height="5" rx="2"/></svg></span>
+                <span class="tabbar-lbl">Dashboard</span>
+            </button>
+            <button class="tabbar-btn" data-tab="Register" onclick="app.switchTab('Register')">
+                <span class="tabbar-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></span>
+                <span class="tabbar-lbl">Tasks</span>
+                <span class="badge" id="badgeRegister">0</span>
+            </button>
+            <button class="tabbar-btn more-tab-btn" id="moreTabBtn" data-tab="More" onclick="app.toggleMoreMenu()">
+                <span class="tabbar-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg></span>
+                <span class="tabbar-lbl">More</span>
+                <span class="badge red" id="badgeMoreTab" style="display:none;">0</span>
+            </button>
+            <button class="tabbar-btn" data-tab="Completed" onclick="app.switchTab('Completed')">
+                <span class="tabbar-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6.5 9.5 17 4 11.5"/></svg></span>
+                <span class="tabbar-lbl">Done</span>
+                <span class="badge" id="badgeCompletedTab">0</span>
+            </button>
+            <button class="tabbar-btn" data-tab="Holidays" onclick="app.switchTab('Holidays')">
+                <span class="tabbar-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+                <span class="tabbar-lbl">Holidays</span>
+            </button>
+            <button class="tabbar-btn" data-tab="Bin" onclick="app.switchTab('Bin')">
+                <span class="tabbar-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></span>
+                <span class="tabbar-lbl">Bin</span>
+                <span class="badge red" id="badgeBinTab">0</span>
+            </button>
+            <button class="tabbar-btn" data-tab="Config" onclick="app.switchTab('Config')">
+                <span class="tabbar-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg></span>
+                <span class="tabbar-lbl">Config</span>
+            </button>
+        </nav>
+
+        <!-- "More" popup — the four tabs that don't fit the mobile bottom bar.
+             Fixed to the viewport (header-wrap has no transform/filter of its
+             own, so this isn't affected by the containing-block issue noted
+             above). Desktop never opens this; all six tabs already show. -->
+        <div class="more-menu-backdrop" id="moreMenuBackdrop" onclick="app.closeMoreMenu()"></div>
+        <div class="more-menu" id="moreMenu">
+            <button class="more-menu-item" data-tab="Completed" onclick="app.switchTab('Completed')">
+                <span class="more-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6.5 9.5 17 4 11.5"/></svg></span>
+                <span>Done</span>
+                <span class="badge" id="badgeCompletedTabMore">0</span>
+            </button>
+            <button class="more-menu-item" data-tab="Holidays" onclick="app.switchTab('Holidays')">
+                <span class="more-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+                <span>Holidays</span>
+            </button>
+            <button class="more-menu-item" data-tab="Bin" onclick="app.switchTab('Bin')">
+                <span class="more-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></span>
+                <span>Bin</span>
+                <span class="badge red" id="badgeBinTabMore">0</span>
+            </button>
+            <button class="more-menu-item" data-tab="Config" onclick="app.switchTab('Config')">
+                <span class="more-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg></span>
+                <span>Config</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- OVERVIEW TAB -->
+    <div class="content-area" id="dashboardTab">
+        <div class="greet" id="dashGreeting"></div>
+
+        <div class="stat-grid" id="dashHero"></div>
+        <div id="dashCharts"></div>
+    </div>
+
+    <!-- TASKS TAB -->
+    <div class="content-area" id="registerTab">
+        <div class="toolbar-row single-line-toolbar" id="registerToolbar">
+            <input autocomplete="off" type="text" class="filter-input search-compact" id="searchInput" placeholder="Search tasks..." oninput="app.debouncedRender()">
+            
+            <div class="toolbar-filters">
+                <div class="multi-select" id="ms-category"><div class="ms-header" onclick="app.toggleDropdown('ms-category')">Categories</div><div class="ms-options" id="filterCategoryOpts"></div></div>
+                <div class="multi-select" id="ms-priority"><div class="ms-header" onclick="app.toggleDropdown('ms-priority')">Priorities</div><div class="ms-options" id="filterPriorityOpts"></div></div>
+                <div class="multi-select" id="ms-status"><div class="ms-header" onclick="app.toggleDropdown('ms-status')">Statuses</div><div class="ms-options" id="filterStatusOpts"></div></div>
+                <select class="filter-select" id="filterPending" onchange="app.renderTable()"><option value="All">All People</option></select>
+                <select class="filter-select" id="filterDue" onchange="app.renderTable()">
+                    <option value="All">Any Due Date</option>
+                    <option value="Overdue">Overdue</option>
+                    <option value="Today">Today</option>
+                    <option value="Tomorrow">Tomorrow</option>
+                    <option value="Next7Days">Next 7 days</option>
+                    <option value="ThisWeek">This week</option>
+                    <option value="NextWeek">Next week</option>
+                    <option value="ThisMonth">This month</option>
+                    <option value="NoDue">No due date</option>
+                </select>
+            </div>
+
+            <div class="toolbar-actions">
+                <button class="btn-icon select-toggle" onclick="app.toggleSelectMode()" title="Select several entries">☑</button>
+                <button class="btn-icon view-toggle" onclick="app.toggleViewMode()" title="Switch between table and cards">▦</button>
+                <button class="btn-icon" onclick="app.clearFilters()" title="Clear Filters">🚫</button>
+                <button class="btn-icon" id="sortToggleRegister" onclick="app.openSortMenu('Register', this)" title="Sort">🔃</button>
+                <button class="btn-icon" onclick="app.fitColumns('register')" title="Fit Columns">⤢</button>
+                <button class="btn-icon" onclick="app.printRegister()" title="Print">🖨️</button>
+                <button class="btn-icon" onclick="app.openEmailModal()" title="Mail">📧</button>
+                <button class="btn-new-entry" onclick="app.openTaskModal()" title="New Entry">＋</button>
+            </div>
+        </div>
+
+        <div class="sub-text">
+            <span id="entriesShownText">0 entries shown</span>
+        </div>
+
+        <p class="swipe-hint">Swipe a card right to complete, left to bin · tap to edit</p>
+        <div class="card-list" id="taskCardList"></div>
+
+        <div class="table-wrap">
+            <div class="table-container">
+                <table id="registerTable">
+                    <colgroup id="registerColgroup"><col><col><col><col><col><col><col><col></colgroup>
+                    <thead id="registerTableHead">
+                        <tr>
+                            <th onclick="app.sortTable('dateLogged')">Logged<span>↕</span></th>
+                            <th onclick="app.sortTable('description')">Task<span>↕</span></th>
+                            <th onclick="app.sortTable('category')">Category<span>↕</span></th>
+                            <th onclick="app.sortTable('priority')">Priority<span>↕</span></th>
+                            <th onclick="app.sortTable('status')">Status<span>↕</span></th>
+                            <th onclick="app.sortTable('pendingWith')">Pending With<span>↕</span></th>
+                            <th onclick="app.sortTable('dueDate')">Due Date<span>↕</span></th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="taskTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- HOLIDAYS TAB -->
+    <div class="content-area" id="holidaysTab">
+        <div class="toolbar-row single-line-toolbar" id="holidaysToolbar">
+            <input autocomplete="off" type="text" class="filter-input search-compact" id="searchHolidays" placeholder="Search holidays..." oninput="app.renderHolidays()">
+            <div class="toolbar-filters">
+                <select class="filter-select" id="filterHolidayType" onchange="app.renderHolidays()" title="Holiday Calendar">
+                    <option value="All">All Calendars</option>
+                </select>
+                <select class="filter-select" id="filterHolidayWhen" onchange="app.renderHolidays()" title="When">
+                    <option value="All">Any Time</option>
+                    <option value="Next7Days">Next 7 Days</option>
+                    <option value="ThisMonth">This Month</option>
+                    <option value="Upcoming">Upcoming</option>
+                    <option value="Past">Past</option>
+                </select>
+            </div>
+            <div class="toolbar-actions">
+                <button class="btn-icon view-toggle" onclick="app.toggleViewMode()" title="Switch between table and cards">▦</button>
+                <button class="btn-new-entry" onclick="app.openHolidayModal()" title="Add Holiday">＋</button>
+            </div>
+        </div>
+
+        <div class="sub-text">
+            <span id="entriesHolidaysText">0 holidays shown</span>
+        </div>
+
+        <div id="continuousHolidayBanner"></div>
+
+        <p class="swipe-hint">Tap a card to edit · tap the bell to toggle its alert</p>
+        <div class="card-list" id="holidaysCardList"></div>
+
+        <div class="table-wrap">
+            <div class="table-container">
+                <table id="holidaysTable">
+                    <colgroup id="holidaysColgroup"><col><col><col><col><col></colgroup>
+                    <thead id="holidaysTableHead">
+                        <tr>
+                            <th>Date</th>
+                            <th>Holiday For</th>
+                            <th>Next Working Day</th>
+                            <th>Holiday Calendar</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="holidaysTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- COMPLETED TAB -->
+    <div class="content-area" id="completedTab">
+        <div class="toolbar-row single-line-toolbar" id="completedToolbar">
+            <input autocomplete="off" type="text" class="filter-input search-compact" id="searchCompleted" placeholder="Search completed..." oninput="app.debouncedRender()">
+            
+            <div class="toolbar-filters">
+                <div class="multi-select" id="ms-category-completed">
+                    <div class="ms-header" onclick="app.toggleDropdown('ms-category-completed')">All Categories</div>
+                    <div class="ms-options" id="filterCategoryCompletedOpts"></div>
+                </div>
+            </div>
+
+            <div class="toolbar-actions">
+                <button class="btn-icon select-toggle" onclick="app.toggleSelectMode()" title="Select several entries">☑</button>
+                <button class="btn-icon view-toggle" onclick="app.toggleViewMode()" title="Switch between table and cards">▦</button>
+                <button class="btn-icon" id="sortToggleCompleted" onclick="app.openSortMenu('Completed', this)" title="Sort">🔃</button>
+                <button class="btn-icon" onclick="app.fitColumns('completed')" title="Fit Columns">⤢</button>
+            </div>
+        </div>
+
+        <div class="sub-text">
+            <span id="entriesCompletedText">0 completed entries</span>
+        </div>
+
+        <p class="swipe-hint">Tap a card to edit</p>
+        <div class="card-list" id="completedCardList"></div>
+
+        <div class="table-wrap">
+            <div class="table-container">
+                <table id="completedTable">
+                    <colgroup id="completedColgroup"><col><col><col><col><col></colgroup>
+                    <thead id="completedTableHead">
+                        <tr><th onclick="app.sortTable('dateLogged')">Logged<span>↕</span></th><th onclick="app.sortTable('description')">Task<span>↕</span></th><th onclick="app.sortTable('category')">Category<span>↕</span></th><th onclick="app.sortTable('completedDate')">Completed<span>↕</span></th><th>Actions</th></tr>
+                    </thead>
+                    <tbody id="completedTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- BIN TAB -->
+    <div class="content-area" id="binTab">
+        <div class="toolbar-row single-line-toolbar" id="binToolbar">
+            <div class="toolbar-actions" style="margin-left: 0;">
+                <button class="btn-icon select-toggle" onclick="app.toggleSelectMode()" title="Select several entries">☑</button>
+                <button class="btn-icon view-toggle" onclick="app.toggleViewMode()" title="Switch between table and cards">▦</button>
+                <button class="btn-icon" id="sortToggleBin" onclick="app.openSortMenu('Bin', this)" title="Sort">🔃</button>
+                <button class="btn-icon" onclick="app.fitColumns('bin')" title="Fit Columns">⤢</button>
+            </div>
+        </div>
+
+        <div class="sub-text">
+            <span id="entriesBinText">0 entries in bin</span>
+        </div>
+
+        <p class="swipe-hint">Use the buttons to restore or delete</p>
+        <div class="card-list" id="binCardList"></div>
+
+        <div class="table-wrap">
+            <div class="table-container">
+                <table id="binTable">
+                    <colgroup id="binColgroup"><col><col><col><col></colgroup>
+                    <thead id="binTableHead">
+                        <tr><th onclick="app.sortTable('dateDeleted')">Deleted<span>↕</span></th><th onclick="app.sortTable('description')">Task<span>↕</span></th><th onclick="app.sortTable('category')">Category<span>↕</span></th><th>Actions</th></tr>
+                    </thead>
+                    <tbody id="binTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- CONFIGURATION TAB -->
+    <div class="content-area" id="configTab">
+        <div class="sheet-stats">
+            <div class="sheet-stat"><b id="entryCount">0</b><span>Active</span></div>
+            <div class="sheet-stat"><b id="badgeCompleted">0</b><span>Done</span></div>
+            <div class="sheet-stat"><b id="badgeBin">0</b><span>In Bin</span></div>
+        </div>
+
+        <div class="cfg-section">
+            <div class="dash-title">Appearance (iOS Glass Themes)</div>
+            <div class="theme-row">
+                <button class="theme-btn" data-theme="pearl" onclick="app.applyTheme('pearl')">⚪ Pearl</button>
+                <button class="theme-btn" data-theme="glass" onclick="app.applyTheme('glass')">🪩 Glassmorphism</button>
+                <button class="theme-btn" data-theme="neuo" onclick="app.applyTheme('neuo')">🧼 Neumorphism</button>
+                <button class="theme-btn" data-theme="clay" onclick="app.applyTheme('clay')">🏺 Claymorphism</button>
+                <button class="theme-btn" data-theme="hero3d" onclick="app.applyTheme('hero3d')">🔮 3D Hero</button>
+            </div>
+        </div>
+
+        <div class="cfg-section">
+            <div class="dash-title">Cloud Sync</div>
+            <div class="sheet-grid">
+                <button class="sheet-item" onclick="app.syncCycle(true)"><span class="ico">↻</span>Sync now</button>
+                <button class="sheet-item" onclick="app.pullTasksFromCloud(true)"><span class="ico">☁️</span>Pull changes</button>
+                <button class="sheet-item" onclick="app.restoreFromCloud()"><span class="ico">⤓</span>Restore</button>
+                <button class="sheet-item" onclick="app.openSyncSetup()"><span class="ico">🔗</span>Connection</button>
+            </div>
+        </div>
+
+        <div class="cfg-section">
+            <div class="dash-title">Push Notifications</div>
+            <p class="cfg-hint">Get overdue/due-soon task alerts even when this app is fully closed — sent through your Apps Script, so Cloud Sync above must be set up first.</p>
+            <div class="walk-row">
+                <button class="sheet-item walk-toggle is-off" id="pushToggle" onclick="app.togglePush()"><span class="ico">🔔</span><span id="pushToggleLabel">Push alerts off</span></button>
+            </div>
+            <p class="cfg-hint" id="pushHint" style="margin-top:10px;"></p>
+        </div>
+
+        <div class="cfg-section">
+            <div class="dash-title">Data Backup</div>
+            <div class="sheet-grid">
+                <button class="sheet-item" onclick="app.exportData('csv')"><span class="ico">💾</span>Export CSV</button>
+                <button class="sheet-item" onclick="document.getElementById('importCSVFile').click()"><span class="ico">📤</span>Import CSV</button>
+                <button class="sheet-item" onclick="app.findDuplicates()"><span class="ico">⧉</span>Duplicates</button>
+            </div>
+        </div>
+
+        <div class="cfg-section">
+            <div class="dash-title">Alarm Sound</div>
+            <p class="cfg-hint">Plays when a task goes past its deadline. Tap a name to use it, or ▶ to preview.</p>
+            <div class="sound-list" id="alarmSoundList"></div>
+        </div>
+
+        <div class="cfg-section">
+            <div class="dash-title">Walk Reminder</div>
+            <p class="cfg-hint">Nudges you to leave the desk while you work. It alerts at each slot in the window below, with the same sound as a task alert.</p>
+            <div class="walk-row">
+                <button class="sheet-item walk-toggle" id="walkToggle" onclick="app.toggleNudge('walk')"><span class="ico">🚶</span><span id="walkToggleLabel">Reminder on</span></button>
+                <label class="walk-field">Start<input autocomplete="off" type="time" id="walkStart" onchange="app.saveNudgeCfg('walk', { start: this.value })"></label>
+                <label class="walk-field">End<input autocomplete="off" type="time" id="walkEnd" onchange="app.saveNudgeCfg('walk', { end: this.value })"></label>
+                <label class="walk-field">Every (min)<input autocomplete="off" type="number" min="10" step="5" id="walkEvery" onchange="app.saveNudgeCfg('walk', { every: Number(this.value) })"></label>
+                <button class="sheet-item" onclick="app.triggerNudge('walk')"><span class="ico">🔔</span>Preview</button>
+            </div>
+            <p class="cfg-hint" id="walkNextHint" style="margin: 12px 0 0;"></p>
+        </div>
+
+        <div class="cfg-section">
+            <div class="dash-title">Water Reminder</div>
+            <p class="cfg-hint">Nudges you to drink water through the day. Same alert style as the walk reminder, on its own schedule.</p>
+            <div class="walk-row">
+                <button class="sheet-item walk-toggle" id="waterToggle" onclick="app.toggleNudge('water')"><span class="ico">💧</span><span id="waterToggleLabel">Reminder on</span></button>
+                <label class="walk-field">Start<input autocomplete="off" type="time" id="waterStart" onchange="app.saveNudgeCfg('water', { start: this.value })"></label>
+                <label class="walk-field">End<input autocomplete="off" type="time" id="waterEnd" onchange="app.saveNudgeCfg('water', { end: this.value })"></label>
+                <label class="walk-field">Every (min)<input autocomplete="off" type="number" min="10" step="5" id="waterEvery" onchange="app.saveNudgeCfg('water', { every: Number(this.value) })"></label>
+                <button class="sheet-item" onclick="app.triggerNudge('water')"><span class="ico">🔔</span>Preview</button>
+            </div>
+            <p class="cfg-hint" id="waterNextHint" style="margin: 12px 0 0;"></p>
+        </div>
+
+        <div class="cfg-section">
+            <div class="dash-title">Time Slots</div>
+            <p class="cfg-hint">Keeps two tasks off the same time. A scheduled task holds the clock for the minutes below, and anything booked inside that window is turned away with the next free time.</p>
+            <div class="walk-row">
+                <button class="sheet-item walk-toggle" id="slotToggle" onclick="app.toggleSlots()"><span class="ico">⏱️</span><span id="slotToggleLabel">Holding on</span></button>
+                <label class="walk-field">Hold for (min)<input autocomplete="off" type="number" min="1" max="240" step="5" id="slotMinutes" onchange="app.saveSlotCfg({ minutes: Number(this.value) })"></label>
+            </div>
+            <p class="cfg-hint" id="slotHint" style="margin: 12px 0 0;"></p>
+        </div>
+
+        <div class="cfg-section">
+            <div class="dash-title">Settings & Tools</div>
+            <div class="sheet-grid">
+                <button class="sheet-item" onclick="app.openListManager('categories')"><span class="ico">⚙️</span>Lists</button>
+                <button class="sheet-item" onclick="app.openEmailModal()"><span class="ico">📥</span>Fetch Mail</button>
+                <button class="sheet-item" onclick="app.testAlarmSound()"><span class="ico">🔔</span>Test Alarm</button>
+            </div>
+        </div>
+
+        <div class="cfg-section" id="appSection">
+            <div class="dash-title">System</div>
+            <div class="sheet-grid">
+                <button class="sheet-item" id="installBtn" style="display:none;" onclick="pwa.install()"><span class="ico">⬇️</span>Install App</button>
+                <button class="sheet-item" id="notifyBtn" onclick="app.enableNotifications()"><span class="ico">🔔</span>Enable Alerts</button>
+                <button class="sheet-item" onclick="pwa.checkUpdate()"><span class="ico">🔄</span>Check Update</button>
+                <button class="sheet-item" onclick="pwa.clearCache()"><span class="ico">🧹</span>Clear Cache</button>
+            </div>
+            <p class="cfg-hint" id="swVersion" style="margin: 14px 0 0;"></p>
+            <p class="cfg-hint" id="installHint" style="margin: 6px 0 0;"></p>
+        </div>
+    </div>
+
+    <!-- TASK MODAL -->
+    <div class="modal" id="taskModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">New Entry</h2>
+                <button class="modal-close" onclick="app.closeTaskModal()">✕</button>
+            </div>
+            <form id="taskForm" autocomplete="off" onsubmit="app.saveTask(event)">
+                <div class="form-group">
+                    <label>Task Description</label>
+                    <input autocomplete="off" type="text" id="taskDescription" required placeholder="e.g. Follow up on LC opening">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Category <a href="#" class="edit-options-btn" onclick="app.openListManager('categories'); return false;">Edit</a></label>
+                        <select id="taskCategory"><option value="">Select category</option></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Priority <a href="#" class="edit-options-btn" onclick="app.openListManager('priorities'); return false;">Edit</a></label>
+                        <select id="taskPriority"></select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Status <a href="#" class="edit-options-btn" onclick="app.openListManager('statuses'); return false;">Edit</a></label>
+                        <select id="taskStatus"></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Pending With <a href="#" class="edit-options-btn" onclick="app.openListManager('pendingWith'); return false;">Edit</a></label>
+                        <select id="taskPendingWith"><option value="">Select person</option></select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label style="color:var(--accent);">Due Date & Time</label>
+                    <div style="display:flex; gap:12px;">
+                        <input autocomplete="off" type="date" id="taskDueDate" onchange="app.checkDueHoliday(); app.checkSlotAvailability()">
+                        <input autocomplete="off" type="time" id="taskDueTime" onchange="app.checkSlotAvailability()">
+                    </div>
+                    <div class="due-hint" id="dueHolidayHint"></div>
+                    <div class="due-hint" id="dueSlotHint"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Mail Chain / Reference</label>
+                        <input autocomplete="off" type="text" id="taskMailChain" placeholder="e.g. Ticket #12345">
+                    </div>
+                    <div class="form-group">
+                        <label>Recurrence</label>
+                        <select id="taskRecurrence">
+                            <option value="None">Doesn't repeat</option>
+                            <option value="Daily">Daily</option>
+                            <option value="Weekly">Weekly</option>
+                            <option value="Monthly">Monthly</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Notes</label>
+                    <textarea autocomplete="off" id="taskNotes" placeholder="Additional notes or context..."></textarea>
+                </div>
+                <div class="modal-buttons">
+                    <button type="button" class="btn-modal secondary" id="viewOriginalEmailBtn" style="display:none;" onclick="app.openStoredEmail()">Open Mail</button>
+                    <button type="submit" class="btn-modal primary">Save Entry</button>
+                    <button type="button" class="btn-modal secondary" onclick="app.closeTaskModal()">Cancel</button>
+                    <button type="button" class="btn-modal danger" id="deleteTaskBtn" style="display:none;" onclick="app.binCurrentTask()">Bin</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MAIL MODAL -->
+    <div class="modal" id="emailListModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Unread Mails</h2>
+                <button class="modal-close" onclick="document.getElementById('emailListModal').classList.remove('open')">✕</button>
+            </div>
+            <div style="margin-bottom: 16px;">
+                <input autocomplete="off" type="text" id="emailSearchInput" class="filter-input" placeholder="Search subject or sender…" oninput="app.renderEmailList()" style="width:100%;">
+            </div>
+            <div id="emailListContainer" style="max-height: 50vh; overflow-y: auto;">
+                <div class="empty-state"><strong>No Data</strong><span>Fetch to load unread mail.</span></div>
+            </div>
+            <div class="modal-buttons">
+                <button class="btn-modal primary" onclick="app.fetchEmails()" id="btnFetchMails">Fetch Unread Mail</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- LIST MANAGER MODAL -->
+    <div class="modal" id="listManagerModal">
+        <div class="modal-content modal-sm">
+            <div class="modal-header">
+                <h2 id="listManagerTitle">Manage List</h2>
+                <button class="modal-close" onclick="app.closeListManager()">✕</button>
+            </div>
+            <div class="form-group">
+                <label>List Selection</label>
+                <select id="listSelector" onchange="app.switchListManager()">
+                    <option value="categories">Categories</option>
+                    <option value="priorities">Priorities</option>
+                    <option value="statuses">Statuses</option>
+                    <option value="pendingWith">Pending with</option>
+                </select>
+            </div>
+            <div id="listManagerItems"></div>
+            <div class="add-row">
+                <input autocomplete="off" type="text" id="newListOptionInput" placeholder="Add new option">
+                <button type="button" onclick="app.addListOption()" class="btn-modal primary">Add</button>
+            </div>
+            <div class="lm-foot">
+                <button type="button" onclick="app.clearList()" class="btn-modal danger">Clear This List</button>
+                <button type="button" onclick="app.closeListManager()" class="btn-modal secondary">Done</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- HOLIDAY MODAL -->
+    <div class="modal" id="holidayModal">
+        <div class="modal-content modal-sm">
+            <div class="modal-header">
+                <h2 id="holidayModalTitle">Add Holiday</h2>
+                <button class="modal-close" onclick="app.closeHolidayModal()">✕</button>
+            </div>
+            <form id="holidayForm" onsubmit="app.saveHolidayForm(event)">
+                <div class="form-group">
+                    <label>Date</label>
+                    <input autocomplete="off" type="date" id="holDate" required onchange="app.suggestHolidayNextWorking()">
+                </div>
+                <div class="form-group">
+                    <label>Holiday For</label>
+                    <input autocomplete="off" type="text" id="holName" placeholder="e.g. Diwali" required>
+                </div>
+                <div class="form-group">
+                    <label>Holiday Calendar</label>
+                    <input autocomplete="off" type="text" id="holType" list="holCalendarList" placeholder="e.g. USD Holiday" required onchange="app.suggestHolidayNextWorking()">
+                    <datalist id="holCalendarList"></datalist>
+                </div>
+                <div class="form-group">
+                    <label>Next Working Day</label>
+                    <input autocomplete="off" type="date" id="holNextWorking">
+                </div>
+                <div class="form-group" style="display:flex; align-items:center; gap:10px; flex-direction:row;">
+                    <input type="checkbox" id="holAlert" checked style="width:18px; height:18px;">
+                    <label for="holAlert" style="margin:0;">Alert me before this holiday</label>
+                </div>
+                <div class="modal-buttons">
+                    <button type="submit" class="btn-modal primary">Save Holiday</button>
+                    <button type="button" class="btn-modal secondary" onclick="app.closeHolidayModal()">Cancel</button>
+                    <button type="button" class="btn-modal danger" id="deleteHolidayBtn" style="display:none;" onclick="app.deleteHoliday(app.editingHolidayId)">Delete</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- CLOUD SETTINGS MODAL -->
+    <div class="modal" id="syncSetupModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Cloud Connection</h2>
+                <button class="modal-close" onclick="document.getElementById('syncSetupModal').classList.remove('open')">✕</button>
+            </div>
+            <div class="form-group">
+                <label>Apps Script Web App URL</label>
+                <input autocomplete="off" type="url" id="syncUrlInput" placeholder="https://script.google.com/macros/s/…/exec">
+            </div>
+            <div class="form-group">
+                <label>Profile Name</label>
+                <input autocomplete="off" type="text" id="profileInput" placeholder="default">
+            </div>
+            <div class="form-group">
+                <label>Gmail Account Index</label>
+                <input autocomplete="off" type="number" id="gmailIndexInput" min="0" step="1" value="0">
+            </div>
+            <div class="modal-buttons">
+                <button class="btn-modal primary" onclick="app.saveSyncUrlModal()">Save Settings</button>
+                <button class="btn-modal secondary" onclick="document.getElementById('syncSetupModal').classList.remove('open')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SORTING DROPDOWN -->
+    <div class="ms-options" id="sortMenuPanel" style="position:fixed; z-index:900;"></div>
+
+    <input type="file" id="importCSVFile" style="display:none;" accept=".csv" onchange="app.importCSV(event)">
+    <div id="bulkBar">
+        <span id="bulkCount">0 selected</span>
+        <button type="button" class="ok"   id="bulkDone"    onclick="app.bulkAction('done')">Complete</button>
+        <button type="button" class="warn" id="bulkReopen"  onclick="app.bulkAction('reopen')">Reopen</button>
+        <button type="button" class="bad"  id="bulkBin"     onclick="app.bulkAction('bin')">Move to Bin</button>
+        <button type="button" class="ok"   id="bulkRestore" onclick="app.bulkAction('restore')">Restore</button>
+        <button type="button" onclick="app.toggleSelectMode()">Cancel</button>
+    </div>
+
+    <div id="toastContainer"></div>
+
+    <script src="./app.js"></script>
+</body>
+</html>

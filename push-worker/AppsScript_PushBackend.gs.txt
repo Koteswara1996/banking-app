@@ -1,0 +1,112 @@
+/* =========================================================================
+   Banking Work Tracker — Push backend additions for Apps Script
+   =========================================================================
+   HOW TO ADD THIS:
+   1. Open your existing Apps Script project (the one behind your Cloud Sync
+      URL) at script.google.com.
+   2. File > New > Script file, name it "PushBackend" (the .gs extension is
+      automatic). Paste everything below the line of ='s into it.
+      (Rename this downloaded file from .gs.txt to .gs if you paste it in
+      some other way — Apps Script needs the real .gs extension.)
+   3. Set your own secret: replace REPLACE_WITH_A_LONG_RANDOM_STRING below
+      with something long and random (e.g. mash the keyboard for 40+
+      characters). This is what stops anyone else from calling the
+      "give me every user's push subscriptions" endpoint — keep it private,
+      the same as you would a password.
+   4. Open your MAIN script file (the one with your doPost(e) function) and
+      find the very first line inside it that parses the request, e.g.
+        var data = JSON.parse(e.postData.contents);
+      Immediately after that line, add:
+        var pushResult = pushHandleAction_(data.action, data);
+        if (pushResult) {
+          return ContentService.createTextOutput(JSON.stringify(pushResult))
+            .setMimeType(ContentService.MimeType.JSON);
+        }
+      This lets the three new actions below short-circuit before your
+      existing action handling — nothing else in your script needs to
+      change. If your doPost doesn't look like that, just make sure these
+      three actions get routed to pushHandleAction_ somehow; the function
+      names below (with trailing underscores) won't collide with anything
+      you already have.
+   5. Save, then Deploy > Manage deployments > (pencil icon) > New version >
+      Deploy — a code change doesn't go live until you redeploy, same as any
+      other edit you've made to this script before.
+   6. Copy the same secret from step 3 into the Cloudflare Worker's
+      WORKER_SECRET (see PUSH_SETUP.md) — they must match exactly.
+   ========================================================================= */
+
+var PUSH_WORKER_SECRET = 'REPLACE_WITH_A_LONG_RANDOM_STRING';
+var PUSH_SHEET_NAME = 'PushSubscriptions';
+
+// Routes the three push-related actions; returns null for everything else
+// so your existing doPost handles it as normal.
+function pushHandleAction_(action, data) {
+  if (action === 'saveSubscription') return pushSaveSubscription_(data);
+  if (action === 'removeSubscription') return pushRemoveSubscription_(data);
+  if (action === 'fetchSubscriptionsForWorker') return pushFetchAllForWorker_(data);
+  return null;
+}
+
+function getPushSheet_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(PUSH_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(PUSH_SHEET_NAME);
+    sheet.appendRow(['username', 'endpoint', 'subscriptionJson', 'updatedAt']);
+  }
+  return sheet;
+}
+
+// Called by the app whenever a device turns push on. Keyed by endpoint, so
+// re-subscribing the same device (or a token refresh) just updates the row
+// instead of creating a duplicate.
+function pushSaveSubscription_(data) {
+  var username = data.username || 'default';
+  var sub = data.subscription;
+  if (!sub || !sub.endpoint) return { status: 'error', message: 'Missing subscription' };
+
+  var sheet = getPushSheet_();
+  var rows = sheet.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) {
+    if (rows[i][1] === sub.endpoint) {
+      sheet.getRange(i + 1, 1, 1, 4).setValues([[username, sub.endpoint, JSON.stringify(sub), new Date().toISOString()]]);
+      return { status: 'success' };
+    }
+  }
+  sheet.appendRow([username, sub.endpoint, JSON.stringify(sub), new Date().toISOString()]);
+  return { status: 'success' };
+}
+
+// Called by the app when push is turned off on a device, and by the Worker
+// itself when a push send comes back 404/410 (subscription is dead).
+function pushRemoveSubscription_(data) {
+  var endpoint = data.endpoint;
+  if (!endpoint) return { status: 'error', message: 'Missing endpoint' };
+
+  var sheet = getPushSheet_();
+  var rows = sheet.getDataRange().getValues();
+  for (var i = rows.length - 1; i >= 1; i--) {
+    if (rows[i][1] === endpoint) { sheet.deleteRow(i + 1); break; }
+  }
+  return { status: 'success' };
+}
+
+// Called only by the Cloudflare Worker's scheduled job, gated by the shared
+// secret — this is the one endpoint that hands back every profile's push
+// subscriptions in one call, so it must not be open to the public internet.
+function pushFetchAllForWorker_(data) {
+  if (!PUSH_WORKER_SECRET || data.secret !== PUSH_WORKER_SECRET) {
+    return { status: 'error', message: 'Forbidden' };
+  }
+
+  var sheet = getPushSheet_();
+  var rows = sheet.getDataRange().getValues();
+  var subscriptions = [];
+  for (var i = 1; i < rows.length; i++) {
+    if (!rows[i][1]) continue;
+    try {
+      subscriptions.push({ username: rows[i][0], subscription: JSON.parse(rows[i][2]) });
+    } catch (e) { /* skip a corrupted row rather than fail the whole batch */ }
+  }
+  return { status: 'success', subscriptions: subscriptions };
+}

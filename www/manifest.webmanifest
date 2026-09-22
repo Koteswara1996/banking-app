@@ -1,0 +1,25 @@
+{
+  "name": "Banking Work Tracker",
+  "short_name": "Bank Tracker",
+  "description": "Track banking follow-ups, payment deadlines and mail chains for Pur Energy.",
+  "id": "/banking-work-tracker/",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait-primary",
+  "background_color": "#eef0f6",
+  "theme_color": "#eef0f6",
+  "categories": ["productivity", "business", "finance"],
+  "lang": "en-IN",
+  "dir": "ltr",
+  "icons": [
+    { "src": "./icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "New entry", "short_name": "New", "url": "./index.html?action=new", "icons": [{ "src": "./icon-192.png", "sizes": "192x192" }] },
+    { "name": "Tasks", "short_name": "Tasks", "url": "./index.html?tab=Register", "icons": [{ "src": "./icon-192.png", "sizes": "192x192" }] }
+  ]
+}
