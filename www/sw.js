@@ -17,7 +17,7 @@
      non-GET         untouched
 */
 
-const CACHE_VERSION = 'btw-v46';
+const CACHE_VERSION = 'btw-v47';
 const SHELL_CACHE = CACHE_VERSION + '-shell';
 const RUNTIME_CACHE = CACHE_VERSION + '-runtime';
 const RUNTIME_LIMIT = 60;

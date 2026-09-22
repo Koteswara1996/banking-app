@@ -2140,6 +2140,13 @@ const app = {
     /* ---------- DEVICE BACK BUTTON → DASHBOARD ---------- */
     initBackNav() {
         window.addEventListener('popstate', () => {
+            // The More popup's backdrop is a full-screen layer — if it's
+            // left open, it silently blocks every tap and scroll underneath
+            // it. The backdrop's own click handler closes it, but the
+            // physical/hardware back button fires this event instead of a
+            // click, so it has to be closed here too or it can get stuck.
+            this.closeMoreMenu();
+
             if (this.currentTab !== 'Dashboard') {
                 this._fromPopstate = true;
                 this._awayFromDashboard = false;
