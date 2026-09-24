@@ -855,6 +855,21 @@
         .theme-btn { flex: 1; min-width: 100px; height: 38px; border: none; background: transparent; border-radius: 12px; font-size: 0.85rem; font-weight: 600; color: var(--label-2); cursor: pointer; transition: all 0.2s var(--ease); }
         .theme-btn.on { background: var(--glass-bg); color: var(--accent); font-weight: 700; box-shadow: var(--glass-shadow-sm), var(--glass-inset); }
 
+        /* ── TEXT SIZE — 5 levels, scales the whole app's rem-based text ── */
+        html[data-text-size="xs"] { font-size: 13px; }
+        html[data-text-size="sm"] { font-size: 14.5px; }
+        html[data-text-size="md"], html:not([data-text-size]) { font-size: 16px; }
+        html[data-text-size="lg"] { font-size: 18px; }
+        html[data-text-size="xl"] { font-size: 20px; }
+        .text-size-row { display: flex; gap: 8px; padding: 6px; background: var(--fill); border-radius: 16px; border: 1px solid var(--glass-border-subtle); }
+        .text-size-btn {
+            flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+            height: 52px; border: none; background: transparent; border-radius: 12px;
+            font-size: 0.68rem; font-weight: 700; color: var(--label-2); cursor: pointer; transition: all 0.2s var(--ease);
+        }
+        .text-size-btn .tsz-a { font-weight: 800; line-height: 1; color: inherit; }
+        .text-size-btn.on { background: var(--glass-bg); color: var(--accent); box-shadow: var(--glass-shadow-sm), var(--glass-inset); }
+
         /* ── TOASTS ──────────────────────────────────────────────── */
         #toastContainer {
             position: fixed; top: calc(var(--appbar-h) + 14px); left: 50%; transform: translateX(-50%);
@@ -1111,6 +1126,8 @@
            overall smaller/tighter cards to fit more on one screen. */
         html[data-shell="mobile"] .theme-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; padding: 6px; }
         html[data-shell="mobile"] .theme-btn { flex: none; min-width: 0; width: 100%; height: 40px; font-size: 0.78rem; }
+        html[data-shell="mobile"] .text-size-row { gap: 6px; }
+        html[data-shell="mobile"] .text-size-btn { height: 46px; }
         html[data-shell="mobile"] .sheet-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
         html[data-shell="mobile"] .sheet-stats { gap: 8px; margin-bottom: 14px; }
         html[data-shell="mobile"] .sheet-stat { padding: 10px 6px; border-radius: 14px; }
@@ -1588,6 +1605,18 @@
         </div>
 
         <div class="cfg-section">
+            <div class="dash-title">Text Size</div>
+            <p class="cfg-hint">Scales text across the whole app — this device only.</p>
+            <div class="text-size-row" id="textSizeRow">
+                <button class="text-size-btn" data-size="xs" onclick="app.applyTextSize('xs')"><span class="tsz-a" style="font-size:0.7rem;">A</span>XS</button>
+                <button class="text-size-btn" data-size="sm" onclick="app.applyTextSize('sm')"><span class="tsz-a" style="font-size:0.85rem;">A</span>S</button>
+                <button class="text-size-btn" data-size="md" onclick="app.applyTextSize('md')"><span class="tsz-a" style="font-size:1rem;">A</span>M</button>
+                <button class="text-size-btn" data-size="lg" onclick="app.applyTextSize('lg')"><span class="tsz-a" style="font-size:1.15rem;">A</span>L</button>
+                <button class="text-size-btn" data-size="xl" onclick="app.applyTextSize('xl')"><span class="tsz-a" style="font-size:1.3rem;">A</span>XL</button>
+            </div>
+        </div>
+
+        <div class="cfg-section">
             <div class="dash-title">Cloud Sync</div>
             <div class="sheet-grid">
                 <button class="sheet-item" onclick="app.syncCycle(true)"><span class="ico">↻</span>Sync now</button>
@@ -1676,6 +1705,7 @@
             </div>
             <p class="cfg-hint" id="swVersion" style="margin: 14px 0 0;"></p>
             <p class="cfg-hint" id="installHint" style="margin: 6px 0 0;"></p>
+            <p class="cfg-hint" id="notifyHint" style="margin: 6px 0 0;"></p>
         </div>
     </div>
 

@@ -40,28 +40,6 @@ const app = {
     lastSyncJSON: "", syncInProgress: false, userClearedAll: false, listsUpdatedAt: 0,
     fetchedEmails: [], storedEmailId: null, _searchTimer: null,
 
-    // Initial Bank Holidays Data (USD & Indian AP/TS) — seed data only.
-    // The working list lives in this.holidays, loaded from localStorage by
-    // loadHolidays() so additions/deletions/alert toggles persist per device.
-    DEFAULT_HOLIDAYS: [
-        { date: '2026-01-01', name: 'New Year\'s Day', nextWorkingDay: '2026-01-02', type: 'USD Holiday' },
-        { date: '2026-01-14', name: 'Bhogi', nextWorkingDay: '2026-01-16', type: 'Indian Bank Holiday' },
-        { date: '2026-01-15', name: 'Makar Sankranti', nextWorkingDay: '2026-01-16', type: 'Indian Bank Holiday' },
-        { date: '2026-01-19', name: 'Martin Luther King Jr. Day', nextWorkingDay: '2026-01-20', type: 'USD Holiday' },
-        { date: '2026-01-26', name: 'Republic Day', nextWorkingDay: '2026-01-27', type: 'Indian Bank Holiday' },
-        { date: '2026-02-16', name: 'Washington\'s Birthday', nextWorkingDay: '2026-02-17', type: 'USD Holiday' },
-        { date: '2026-03-19', name: 'Ugadi', nextWorkingDay: '2026-03-20', type: 'Indian Bank Holiday' },
-        { date: '2026-05-25', name: 'Memorial Day', nextWorkingDay: '2026-05-26', type: 'USD Holiday' },
-        { date: '2026-07-03', name: 'Independence Day (Observed)', nextWorkingDay: '2026-07-06', type: 'USD Holiday' },
-        { date: '2026-08-15', name: 'Independence Day (India)', nextWorkingDay: '2026-08-17', type: 'Indian Bank Holiday' },
-        { date: '2026-09-07', name: 'Labor Day', nextWorkingDay: '2026-09-08', type: 'USD Holiday' },
-        { date: '2026-10-02', name: 'Mahatma Gandhi Jayanti', nextWorkingDay: '2026-10-05', type: 'Indian Bank Holiday' },
-        { date: '2026-10-12', name: 'Columbus Day', nextWorkingDay: '2026-10-13', type: 'USD Holiday' },
-        { date: '2026-11-11', name: 'Veterans Day', nextWorkingDay: '2026-11-12', type: 'USD Holiday' },
-        { date: '2026-11-26', name: 'Thanksgiving Day', nextWorkingDay: '2026-11-27', type: 'USD Holiday' },
-        { date: '2026-12-25', name: 'Christmas Day', nextWorkingDay: '2026-12-28', type: 'USD Holiday' }
-    ],
-
     // Shared Icons for Space-Saving Buttons
     SVGS: {
         edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>',
@@ -143,6 +121,7 @@ const app = {
         this.currentUser = localStorage.getItem('currentUser') || 'default';
         localStorage.setItem('currentUser', this.currentUser);
         this.applyTheme();
+        this.applyTextSize();
 
         document.getElementById('mainAppHeader').style.display = 'flex';
         document.getElementById('tabBar').style.display = 'flex';
@@ -198,6 +177,21 @@ const app = {
 
         document.querySelectorAll('.theme-btn').forEach(b => {
             b.classList.toggle('on', b.dataset.theme === pick);
+        });
+    },
+
+    TEXT_SIZE_KEY: 'pureEnergyTextSize',
+    TEXT_SIZES: ['xs', 'sm', 'md', 'lg', 'xl'],
+
+    applyTextSize(size) {
+        let pick = size || localStorage.getItem(this.TEXT_SIZE_KEY) || 'md';
+        if (!this.TEXT_SIZES.includes(pick)) pick = 'md';
+
+        localStorage.setItem(this.TEXT_SIZE_KEY, pick);
+        document.documentElement.setAttribute('data-text-size', pick);
+
+        document.querySelectorAll('.text-size-btn').forEach(b => {
+            b.classList.toggle('on', b.dataset.size === pick);
         });
     },
 
@@ -266,6 +260,7 @@ const app = {
         if (this.tasks.length === 0) this.pullTasksFromCloud(false);
 
         this.checkHolidayAlerts();
+        this.checkLunarHolidayReminder();
 
         this.engineInterval = setInterval(() => { this.processEngine(); }, 5000);
         setInterval(() => { this.updateHeader(); this.renderNudgeSettings(); this.checkHolidayAlerts(); }, 60000);
@@ -2266,18 +2261,124 @@ const app = {
     },
 
     /* ---------- HOLIDAYS: STORAGE ---------- */
+    // Seed holidays are computed per-year, not frozen to one hardcoded year.
+    // US federal holidays follow fixed rules (nth weekday of month, or a
+    // fixed date with the standard Sat->Fri / Sun->Mon "observed" shift), so
+    // they're generated here for whichever years are actually needed. Three
+    // Indian holidays with fixed dates (Republic Day, Independence Day,
+    // Gandhi Jayanti) are generated the same way. Bhogi/Makar Sankranti and
+    // Ugadi follow the lunar calendar and genuinely can't be computed from a
+    // rule — those stay as data you add yourself via the Holidays tab's +
+    // button each year (checkLunarHolidayReminder nudges for this once the
+    // date's usually been announced).
+    nthWeekday(year, month, weekday, n) {
+        const first = new Date(year, month - 1, 1);
+        const day = 1 + ((weekday - first.getDay() + 7) % 7) + (n - 1) * 7;
+        return new Date(year, month - 1, day);
+    },
+
+    lastWeekday(year, month, weekday) {
+        const last = new Date(year, month, 0); // day 0 of next month = last day of this one
+        const day = last.getDate() - ((last.getDay() - weekday + 7) % 7);
+        return new Date(year, month - 1, day);
+    },
+
+    observedShift(date) {
+        const day = date.getDay();
+        if (day === 6) return new Date(date.getFullYear(), date.getMonth(), date.getDate() - 1); // Sat -> Fri before
+        if (day === 0) return new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1); // Sun -> Mon after
+        return date;
+    },
+
+    generateSeedHolidaysForYear(year) {
+        const usRaw = [
+            ["New Year's Day", new Date(year, 0, 1)],
+            ['Martin Luther King Jr. Day', this.nthWeekday(year, 1, 1, 3)],
+            ["Washington's Birthday", this.nthWeekday(year, 2, 1, 3)],
+            ['Memorial Day', this.lastWeekday(year, 5, 1)],
+            ['Independence Day', new Date(year, 6, 4)],
+            ['Labor Day', this.nthWeekday(year, 9, 1, 1)],
+            ['Columbus Day', this.nthWeekday(year, 10, 1, 2)],
+            ['Veterans Day', new Date(year, 10, 11)],
+            ['Thanksgiving Day', this.nthWeekday(year, 11, 4, 4)],
+            ['Christmas Day', new Date(year, 11, 25)]
+        ].map(([name, date]) => {
+            const observed = this.observedShift(date);
+            const shifted = observed.getTime() !== date.getTime();
+            return { name: shifted ? name + ' (Observed)' : name, dateObj: observed, type: 'USD Holiday' };
+        });
+
+        const indianFixed = [
+            ['Republic Day', new Date(year, 0, 26)],
+            ['Independence Day (India)', new Date(year, 7, 15)],
+            ['Mahatma Gandhi Jayanti', new Date(year, 9, 2)]
+        ].map(([name, date]) => ({ name, dateObj: date, type: 'Indian Bank Holiday' }));
+
+        const list = [...usRaw, ...indianFixed].map(h => ({
+            date: this.getLocalDateStr(h.dateObj), name: h.name, type: h.type
+        }));
+        const dateSet = new Set(list.map(h => h.date));
+
+        return list
+            .map(h => ({ ...h, nextWorkingDay: this.nextWorkingDayFrom(h.date, dateSet) }))
+            .sort((a, b) => a.date.localeCompare(b.date));
+    },
+
+    nextWorkingDayFrom(dateStr, holidayDateSet) {
+        let next = this.addDaysStr(dateStr, 1);
+        let guard = 0;
+        while ((this.isWeekendStr(next) || holidayDateSet.has(next)) && guard < 14) {
+            next = this.addDaysStr(next, 1);
+            guard++;
+        }
+        return next;
+    },
+
+    // Adds this year's + next year's rule-based holidays if they're not
+    // already present — never touches or duplicates anything the user
+    // added, edited, or already has stored (checked by date).
+    ensureSeedHolidayCoverage() {
+        const years = [new Date().getFullYear(), new Date().getFullYear() + 1];
+        const existingDates = new Set(this.holidays.map(h => h.date));
+        let added = false;
+
+        years.forEach(year => {
+            this.generateSeedHolidaysForYear(year).forEach(h => {
+                if (existingDates.has(h.date)) return;
+                this.holidays.push(Object.assign({ id: this.newId(), alert: true, custom: false }, h));
+                existingDates.add(h.date);
+                added = true;
+            });
+        });
+
+        if (added) this.saveHolidays(false);
+    },
+
+    // One-time-per-year nudge: once next year's lunar-calendar Indian
+    // holidays are usually announced (Nov/Dec), check whether they've been
+    // added yet and remind if not — rather than silently having none.
+    checkLunarHolidayReminder() {
+        const now = new Date();
+        if (now.getMonth() + 1 < 11) return; // only Nov/Dec
+        const nextYear = now.getFullYear() + 1;
+        const fixedNames = ['Republic Day', 'Independence Day (India)', 'Mahatma Gandhi Jayanti'];
+        const hasLunarNextYear = this.holidays.some(h =>
+            h.type === 'Indian Bank Holiday' && h.date.startsWith(String(nextYear)) && !fixedNames.includes(h.name)
+        );
+        if (hasLunarNextYear) return;
+
+        const seenKey = 'pureEnergyLunarReminderSeen_' + nextYear;
+        if (localStorage.getItem(seenKey)) return;
+        localStorage.setItem(seenKey, '1');
+        this.showToast("Once announced, add next year's Makar Sankranti & Ugadi dates — Holidays tab → +", 'info');
+    },
+
     loadHolidays() {
         let stored = null;
         try { stored = JSON.parse(localStorage.getItem(CONFIG.HOLIDAYS_KEY) || 'null'); } catch (e) { stored = null; }
 
-        if (Array.isArray(stored) && stored.length) {
-            this.holidays = stored;
-        } else {
-            this.holidays = this.DEFAULT_HOLIDAYS.map(h => Object.assign(
-                { id: this.newId(), alert: true, custom: false }, h
-            ));
-            this.saveHolidays(false);
-        }
+        this.holidays = (Array.isArray(stored) && stored.length) ? stored : [];
+        this.ensureSeedHolidayCoverage();
     },
 
     saveHolidays(toast) {
@@ -2377,7 +2478,17 @@ const app = {
     renderContinuousHolidayBanner(list) {
         const box = document.getElementById('continuousHolidayBanner');
         if (!box) return;
-        const blocks = this.computeContinuousHolidayBlocks(list);
+        const todayStr = this.getLocalDateStr(new Date());
+        // Same upcoming-first / past-last ordering as the main list below —
+        // this used to just be whatever order the date-walk produced them
+        // in (oldest first), so a past long weekend from January could sit
+        // above an upcoming one, right at the top of the screen.
+        const blocks = this.computeContinuousHolidayBlocks(list).sort((a, b) => {
+            const aPast = a.end < todayStr;
+            const bPast = b.end < todayStr;
+            if (aPast !== bPast) return aPast ? 1 : -1;
+            return aPast ? b.start.localeCompare(a.start) : a.start.localeCompare(b.start);
+        });
         if (!blocks.length) { box.innerHTML = ''; return; }
 
         box.innerHTML = '<div class="cont-hol-wrap">' + blocks.map(b => {
