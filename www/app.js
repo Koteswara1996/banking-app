@@ -7,6 +7,7 @@ const CONFIG = {
     LEGACY_MIGRATED_KEY: 'pureEnergyLegacyMigratedTo',
     BASE_LISTS_TS_KEY: 'pureEnergyListsUpdatedAt',
     BASE_HOLIDAYS_KEY: 'pureEnergyHolidaysCustom',
+    BASE_LOG_KEY: 'pureEnergyActivityLog',
     // Public half of the VAPID key pair for Web Push (see PUSH_SETUP.md).
     // Safe to be public — it's what identifies this app to the push service,
     // not a secret. The private half lives only in the Cloudflare Worker.
@@ -14,7 +15,8 @@ const CONFIG = {
     get STORAGE_KEY() { return `${this.BASE_STORAGE_KEY}_${app.currentUser}`; },
     get LISTS_KEY() { return `${this.BASE_LISTS_KEY}_${app.currentUser}`; },
     get LISTS_TS_KEY() { return `${this.BASE_LISTS_TS_KEY}_${app.currentUser}`; },
-    get HOLIDAYS_KEY() { return `${this.BASE_HOLIDAYS_KEY}_${app.currentUser}`; }
+    get HOLIDAYS_KEY() { return `${this.BASE_HOLIDAYS_KEY}_${app.currentUser}`; },
+    get LOG_KEY() { return `${this.BASE_LOG_KEY}_${app.currentUser}`; }
 };
 
 // Web Push requires the VAPID key as a raw Uint8Array, not the base64url
@@ -260,10 +262,11 @@ const app = {
         if (this.tasks.length === 0) this.pullTasksFromCloud(false);
 
         this.checkHolidayAlerts();
+        this.checkContinuousHolidayLeadUpAlerts();
         this.checkLunarHolidayReminder();
 
         this.engineInterval = setInterval(() => { this.processEngine(); }, 5000);
-        setInterval(() => { this.updateHeader(); this.renderNudgeSettings(); this.checkHolidayAlerts(); }, 60000);
+        setInterval(() => { this.updateHeader(); this.renderNudgeSettings(); this.checkHolidayAlerts(); this.checkContinuousHolidayLeadUpAlerts(); }, 60000);
         setInterval(() => { this.syncCycle(); }, this.SYNC_EVERY_MS);
         setTimeout(() => this.syncCycle(), 2500);
 
@@ -2006,11 +2009,12 @@ const app = {
 
     // Visual order of the tabs in the bottom/segmented tabbar — also the
     // order swipe-left/right steps through.
-    TAB_ORDER: ['Dashboard', 'Register', 'Holidays', 'Completed', 'Bin', 'Config'],
+    TAB_ORDER: ['Dashboard', 'Register', 'Holidays', 'Completed', 'Config', 'Bin'],
 
     switchTab(tab, dir) {
         if (tab !== this.currentTab) this.exitSelectMode();
         this.closeMoreMenu();
+        document.querySelectorAll('.single-line-toolbar.panel-open').forEach(t => t.classList.remove('panel-open'));
 
         // Work out a swipe direction automatically when the caller didn't
         // pass one (e.g. a tab-bar tap), so the animation always makes sense.
@@ -2147,6 +2151,18 @@ const app = {
         });
     },
 
+    // The gear button that collapses search/filters/actions on mobile —
+    // only one toolbar panel open at a time, closes any other first.
+    toggleToolbarPanel(id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const opening = !el.classList.contains('panel-open');
+        document.querySelectorAll('.single-line-toolbar.panel-open').forEach(t => {
+            if (t !== el) t.classList.remove('panel-open');
+        });
+        el.classList.toggle('panel-open', opening);
+    },
+
     toggleFilters() {
         const bar = document.getElementById('registerFilters');
         if (bar) {
@@ -2170,6 +2186,7 @@ const app = {
         const diffDays = Math.round((target - today) / (1000 * 60 * 60 * 24));
 
         if (mode === 'Today') return diffDays === 0;
+        if (mode === 'AsOfToday') return diffDays <= 0;
         if (mode === 'Tomorrow') return diffDays === 1;
         if (mode === 'Next7Days') return diffDays >= 1 && diffDays <= 7;
 
@@ -2367,7 +2384,7 @@ const app = {
         );
         if (hasLunarNextYear) return;
 
-        const seenKey = 'pureEnergyLunarReminderSeen_' + nextYear;
+        const seenKey = 'pureEnergyLunarReminderSeen_' + nextYear + '_' + this.currentUser;
         if (localStorage.getItem(seenKey)) return;
         localStorage.setItem(seenKey, '1');
         this.showToast("Once announced, add next year's Makar Sankranti & Ugadi dates — Holidays tab → +", 'info');
@@ -2384,6 +2401,57 @@ const app = {
     saveHolidays(toast) {
         localStorage.setItem(CONFIG.HOLIDAYS_KEY, JSON.stringify(this.holidays));
         if (toast) this.showToast('Holiday saved', 'success');
+    },
+
+    /* ---------- ACTIVITY LOG ---------- */
+    // A simple, on-device record of what's happened in the app — task and
+    // holiday changes, sync events. Capped at the most recent 200 entries.
+    logActivity(message) {
+        let log = [];
+        try { log = JSON.parse(localStorage.getItem(CONFIG.LOG_KEY) || '[]'); } catch (e) { log = []; }
+        log.unshift({ ts: Date.now(), message: String(message) });
+        if (log.length > 200) log = log.slice(0, 200);
+        try { localStorage.setItem(CONFIG.LOG_KEY, JSON.stringify(log)); } catch (e) { /* storage full — skip silently */ }
+    },
+
+    readActivityLog() {
+        try { return JSON.parse(localStorage.getItem(CONFIG.LOG_KEY) || '[]'); } catch (e) { return []; }
+    },
+
+    formatLogTime(ts) {
+        const d = new Date(ts);
+        return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ' · ' +
+            d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    },
+
+    openActivityLog() {
+        this.renderActivityLog();
+        document.getElementById('activityLogModal')?.classList.add('open');
+    },
+
+    closeActivityLog() {
+        document.getElementById('activityLogModal')?.classList.remove('open');
+    },
+
+    renderActivityLog() {
+        const box = document.getElementById('activityLogList');
+        if (!box) return;
+        const log = this.readActivityLog();
+        if (!log.length) {
+            box.innerHTML = '<div class="empty-state"><strong>No activity yet</strong><span>Actions you take will show up here.</span></div>';
+            return;
+        }
+        box.innerHTML = log.map(e =>
+            '<div class="log-row"><span class="log-time">' + this.formatLogTime(e.ts) + '</span>' +
+            '<span class="log-msg">' + this.sanitize(e.message) + '</span></div>'
+        ).join('');
+    },
+
+    clearActivityLog() {
+        if (!confirm('Clear the activity log? This cannot be undone.')) return;
+        localStorage.removeItem(CONFIG.LOG_KEY);
+        this.renderActivityLog();
+        this.showToast('Activity log cleared', 'info');
     },
 
     holidayCalendars() {
@@ -2495,8 +2563,8 @@ const app = {
             const days = this.dateDiffDays(b.start, b.end) + 1;
             const names = Array.from(new Set(b.items.map(h => h.name))).join(', ');
             const range = b.start === b.end
-                ? this.formatDateStr(b.start, { day: 'numeric', month: 'short' })
-                : this.formatDateStr(b.start, { day: 'numeric', month: 'short' }) + ' – ' + this.formatDateStr(b.end, { day: 'numeric', month: 'short' });
+                ? this.formatDateStr(b.start, { weekday: 'short', day: 'numeric', month: 'short' })
+                : this.formatDateStr(b.start, { weekday: 'short', day: 'numeric', month: 'short' }) + ' – ' + this.formatDateStr(b.end, { weekday: 'short', day: 'numeric', month: 'short' });
             return '<div class="cont-hol-card"><span class="cont-hol-ico">🎉</span>' +
                 '<div class="cont-hol-body"><div class="cont-hol-title">' + days + '-day continuous holiday · ' + range + '</div>' +
                 '<div class="cont-hol-sub">' + this.sanitize(names) + '</div></div></div>';
@@ -2584,8 +2652,9 @@ const app = {
                 filtered.forEach(h => {
                     const row = document.createElement('tr');
                     const cls = this.holidayChipClass(h.type);
+                    const weekend = this.isWeekendStr(h.date);
                     row.innerHTML = `
-                        <td style="font-family: var(--font-num); font-weight: 600; white-space:nowrap;">${this.formatDateStr(h.date)}</td>
+                        <td style="font-family: var(--font-num); font-weight: 600; white-space:nowrap;${weekend ? ' color: var(--red-ink);' : ''}">${this.formatDateStr(h.date, { weekday: 'short', day: 'numeric', month: 'short' })}${weekend ? ' <span class="chip hol-weekend" style="margin-left:4px;">Weekend</span>' : ''}</td>
                         <td style="font-weight: 700; color: var(--label);">${this.sanitize(h.name)}</td>
                         <td style="font-family: var(--font-num); color: var(--label-2); white-space:nowrap;">${this.formatDateStr(h.nextWorkingDay)}</td>
                         <td><span class="chip ${cls}">${this.sanitize(h.type)}</span></td>
@@ -2617,6 +2686,7 @@ const app = {
         list.forEach(h => {
             const idAttr = this.escAttr(h.id);
             const cls = this.holidayChipClass(h.type);
+            const weekend = this.isWeekendStr(h.date);
             const card = document.createElement('article');
             card.className = 'tcard';
             card.dataset.recordId = h.id;
@@ -2629,7 +2699,7 @@ const app = {
                 <div class="tcard-body">
                 <div class="tcard-chips">
                     <span class="chip ${cls}">${this.sanitize(h.type)}</span>
-                    <span class="chip">${this.formatDateStr(h.date, { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                    <span class="chip${weekend ? ' hol-weekend' : ''}">${this.formatDateStr(h.date, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</span>
                 </div>
                 <div class="tcard-foot">
                     <span class="tcard-due">Next working: ${this.formatDateStr(h.nextWorkingDay, { day: 'numeric', month: 'short' })}</span>
@@ -2690,16 +2760,19 @@ const app = {
         this.saveHolidays();
         this.renderHolidays();
         this.closeHolidayModal();
+        this.logActivity((this.editingHolidayId ? 'Updated holiday: "' : 'Added holiday: "') + name + '"');
         this.showToast('Holiday saved', 'success');
     },
 
     deleteHoliday(id) {
         if (!id) return;
         if (!confirm('Delete this holiday?')) return;
+        const h = this.holidays.find(x => String(x.id) === String(id));
         this.holidays = this.holidays.filter(h => String(h.id) !== String(id));
         this.saveHolidays();
         this.renderHolidays();
         this.closeHolidayModal();
+        this.logActivity('Deleted holiday: "' + (h ? h.name : 'holiday') + '"');
         this.showToast('Holiday deleted', 'info');
     },
 
@@ -2718,7 +2791,7 @@ const app = {
         const tomorrowStr = this.addDaysStr(todayStr, 1);
 
         let seen = {};
-        try { seen = JSON.parse(localStorage.getItem('pureEnergyHolidayAlertSeen') || '{}'); } catch (e) { seen = {}; }
+        try { seen = JSON.parse(localStorage.getItem('pureEnergyHolidayAlertSeen_' + this.currentUser) || '{}'); } catch (e) { seen = {}; }
         if (seen.date !== todayStr) seen = { date: todayStr, ids: [] };
 
         const due = this.holidays.filter(h => h.alert !== false && (h.date === todayStr || h.date === tomorrowStr));
@@ -2730,7 +2803,45 @@ const app = {
             seen.ids.push(h.id);
         });
 
-        if (due.length) localStorage.setItem('pureEnergyHolidayAlertSeen', JSON.stringify(seen));
+        if (due.length) localStorage.setItem('pureEnergyHolidayAlertSeen_' + this.currentUser, JSON.stringify(seen));
+    },
+
+    // For a continuous run of holidays (e.g. a holiday next to a weekend
+    // making a 5-day break) — a daily heads-up for the 3 days leading up
+    // to it, so it doesn't just appear with one day's notice like a single
+    // holiday does. Stops once the break actually starts (that day is
+    // already covered by checkHolidayAlerts above).
+    checkContinuousHolidayLeadUpAlerts() {
+        if (!this.holidays || !this.holidays.length) return;
+        const todayStr = this.getLocalDateStr(new Date());
+        const blocks = this.computeContinuousHolidayBlocks(this.holidays);
+        if (!blocks.length) return;
+
+        let seen = {};
+        try { seen = JSON.parse(localStorage.getItem('pureEnergyContHolidaySeen_' + this.currentUser) || '{}'); } catch (e) { seen = {}; }
+        if (seen.date !== todayStr) seen = { date: todayStr, keys: [] };
+
+        let any = false;
+        blocks.forEach(b => {
+            const daysUntilStart = this.dateDiffDays(todayStr, b.start);
+            if (daysUntilStart < 1 || daysUntilStart > 3) return; // only the 3 days before it starts
+
+            const key = b.start + '_' + b.end;
+            if (seen.keys.includes(key)) return;
+
+            const days = this.dateDiffDays(b.start, b.end) + 1;
+            const names = Array.from(new Set(b.items.map(h => h.name))).join(', ');
+            const range = this.formatDateStr(b.start, { day: 'numeric', month: 'short' }) + ' – ' + this.formatDateStr(b.end, { day: 'numeric', month: 'short' });
+            const dayWord = daysUntilStart === 1 ? '1 day' : daysUntilStart + ' days';
+            const msg = days + '-day continuous holiday starts in ' + dayWord + ' (' + range + ') — ' + names;
+
+            this.sendDesktopNotification('🎉 Upcoming holiday break', msg, false, 'cont-holiday-' + key);
+            this.showToast(msg, 'info');
+            seen.keys.push(key);
+            any = true;
+        });
+
+        if (any) localStorage.setItem('pureEnergyContHolidaySeen_' + this.currentUser, JSON.stringify(seen));
     },
 
     renderRegister() {
@@ -3151,6 +3262,7 @@ const app = {
         this.saveData();
         this.renderTable();
         this.processEngine();
+        this.logActivity((editing ? 'Updated task: "' : 'Added task: "') + desc + '"');
         this.showToast(editing ? 'Entry updated.' : 'Entry added.', 'success');
         this.syncToGoogleSheets();
     },
@@ -3218,6 +3330,7 @@ const app = {
         this.saveData();
         this.renderTable();
         this.processEngine();
+        this.logActivity((repeat ? 'Completed (recurring): "' : 'Completed: "') + t.description + '"');
         this.showToast(
             repeat ? 'Done — next occurrence scheduled.' : 'Marked complete.',
             'success',
@@ -3250,6 +3363,7 @@ const app = {
         this.saveData();
         this.renderTable();
         this.processEngine();
+        this.logActivity('Reopened: "' + t.description + '"');
         this.showToast('Entry reopened.', 'success');
         this.syncToGoogleSheets();
     },
@@ -3267,6 +3381,7 @@ const app = {
 
         this.saveData();
         this.renderTable();
+        this.logActivity('Moved to Bin: "' + t.description + '"');
         this.showToast('Moved to Bin.', 'success', { label: 'Undo', onClick: () => this.restoreTask(id) });
         this.syncToGoogleSheets();
     },
@@ -3282,6 +3397,7 @@ const app = {
         this.saveData();
         this.renderTable();
         this.processEngine();
+        this.logActivity('Restored from Bin: "' + t.description + '"');
         this.showToast('Entry restored.', 'success');
         this.syncToGoogleSheets();
     },
@@ -3297,6 +3413,7 @@ const app = {
 
         this.saveData();
         this.renderTable();
+        this.logActivity('Permanently deleted: "' + t.description + '"');
         this.showToast('Entry deleted permanently.', 'success');
         this.syncToGoogleSheets();
     },
@@ -3455,6 +3572,7 @@ const app = {
 
         const overdue = open.filter(t => this.isDateInRange(t, 'Overdue'));
         const dueToday = open.filter(t => this.isDateInRange(t, 'Today'));
+        const pendingAsOfToday = open.filter(t => this.isDateInRange(t, 'AsOfToday'));
         const next7 = open.filter(t => this.isDateInRange(t, 'Next7Days'));
         const thisMonth = open.filter(t => this.isDateInRange(t, 'ThisMonth'));
         const monthName = new Date().toLocaleDateString('en-IN', { month: 'long' });
@@ -3485,6 +3603,11 @@ const app = {
 
         /* ---- due-date cards ---- */
         heroBox.innerHTML = [
+            this.dashTile({
+                title: 'Pending as of Today', count: pendingAsOfToday.length, colour: 'var(--red)',
+                ftype: 'due', fvalue: 'AsOfToday',
+                sub: pendingAsOfToday.length ? 'Needs handling today' : 'All caught up'
+            }),
             this.dashTile({
                 title: 'Due Today', count: dueToday.length, colour: 'var(--blue)',
                 ftype: 'due', fvalue: 'Today',
@@ -3563,7 +3686,7 @@ const app = {
         this.switchTab('Register');
 
         const labels = { due: 'Due', category: 'Category', status: 'Status', priority: 'Priority', pending: 'Pending with' };
-        const pretty = { Today: 'Due today', Overdue: 'Overdue', Next7Days: 'Next 7 days', ThisMonth: 'This month', NoDue: 'No due date' };
+        const pretty = { Today: 'Due today', AsOfToday: 'Pending as of today', Overdue: 'Overdue', Next7Days: 'Next 7 days', ThisMonth: 'This month', NoDue: 'No due date' };
         this.showToast((labels[ftype] || ftype) + ': ' + (pretty[fvalue] || fvalue), 'info');
     },
 

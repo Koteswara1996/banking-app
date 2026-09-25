@@ -1045,6 +1045,16 @@
         .cont-hol-title { font-size: 0.85rem; font-weight: 800; color: var(--amber-ink); }
         .cont-hol-sub { font-size: 0.76rem; font-weight: 600; color: var(--label-2); margin-top: 1px; }
 
+        /* ── ACTIVITY LOG ─────────────────────────────────────────── */
+        .log-list { max-height: 55vh; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+        .log-row {
+            display: flex; flex-direction: column; gap: 2px; padding: 10px 12px;
+            border-bottom: 1px solid var(--line);
+        }
+        .log-row:last-child { border-bottom: none; }
+        .log-time { font-size: 0.7rem; font-weight: 700; color: var(--label-3); text-transform: uppercase; letter-spacing: 0.02em; }
+        .log-msg { font-size: 0.85rem; font-weight: 600; color: var(--label); }
+
         /* ── HOLIDAY CARD (card-list view) ───────────────────────── */
         .hol-bell {
             flex: 0 0 auto; width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center;
@@ -1056,6 +1066,7 @@
         .chip.hol-usd { color: var(--blue-ink); background: rgba(0,122,255,0.08); border-color: rgba(0,122,255,0.18); }
         .chip.hol-ind { color: var(--amber-ink); background: rgba(255,149,0,0.08); border-color: rgba(255,149,0,0.18); }
         .chip.hol-other { color: var(--violet-ink); background: rgba(175,82,222,0.08); border-color: rgba(175,82,222,0.18); }
+        .chip.hol-weekend { color: var(--red-ink); background: rgba(255,59,48,0.1); border-color: rgba(255,59,48,0.22); font-weight: 800; }
 
         @media (max-width: 420px) {
             .stat-grid { grid-template-columns: repeat(2, 1fr); }
@@ -1106,8 +1117,8 @@
         html[data-shell="mobile"] .tabbar-btn[data-tab="Register"]  { order: 2; }
         html[data-shell="mobile"] .tabbar-btn[data-tab="Holidays"]  { order: 3; }
         html[data-shell="mobile"] .tabbar-btn[data-tab="Completed"] { order: 4; }
-        html[data-shell="mobile"] .tabbar-btn[data-tab="Bin"],
-        html[data-shell="mobile"] .tabbar-btn[data-tab="Config"] { display: none; }
+        html[data-shell="mobile"] .tabbar-btn[data-tab="Config"]    { order: 5; }
+        html[data-shell="mobile"] .tabbar-btn[data-tab="Bin"] { display: none; }
 
         .icon-tab-btn {
             display: none; position: relative; align-items: center; justify-content: center;
@@ -1150,6 +1161,28 @@
            Bin and Holidays. */
         html[data-shell="mobile"] .single-line-toolbar { flex-wrap: wrap; overflow-x: visible; gap: 8px; align-items: stretch; }
         html[data-shell="mobile"] .search-compact { flex: 1 1 100%; order: 1; }
+
+        /* Search + filters + action icons collapse behind a single gear
+           button on mobile so the toolbar doesn't eat the top of the
+           screen — tap it to open the same controls as a dropdown panel.
+           display:contents on desktop makes the wrapper invisible to
+           layout entirely, so desktop is completely unaffected. */
+        .toolbar-panel { display: contents; }
+        .toolbar-gear-btn {
+            display: none; flex: 0 0 auto; align-items: center; justify-content: center;
+            width: 40px; height: 40px; border-radius: 12px; font-size: 1.05rem;
+            background: var(--fill); border: 1px solid var(--glass-border-subtle);
+            cursor: pointer; transition: all 0.2s var(--ease);
+        }
+        .toolbar-gear-btn:active { transform: scale(0.92); }
+        html[data-shell="mobile"] .toolbar-gear-btn { display: inline-flex; }
+        html[data-shell="mobile"] .toolbar-panel {
+            display: none; flex-direction: column; gap: 8px; width: 100%; order: 5;
+            margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--glass-border-subtle);
+        }
+        html[data-shell="mobile"] .single-line-toolbar.panel-open { align-items: flex-start; }
+        html[data-shell="mobile"] .single-line-toolbar.panel-open .toolbar-panel { display: flex; }
+        html[data-shell="mobile"] .single-line-toolbar.panel-open .toolbar-gear-btn { color: var(--accent); background: var(--glass-bg); border-color: var(--glass-border); }
         html[data-shell="mobile"] .toolbar-filters {
             order: 2; width: 100%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
         }
@@ -1354,9 +1387,6 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>
                 <span class="badge red" id="badgeBinHeader" style="display:none;">0</span>
             </button>
-            <button class="icon-tab-btn" id="configHeaderBtn" data-tab="Config" onclick="app.switchTab('Config')" title="Config">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg>
-            </button>
             <div class="autosave" id="saveStatus"><span class="dot"></span> Saved</div>
         </div>
     </header>
@@ -1403,6 +1433,8 @@
     <!-- TASKS TAB -->
     <div class="content-area" id="registerTab">
         <div class="toolbar-row single-line-toolbar" id="registerToolbar">
+            <button type="button" class="toolbar-gear-btn" onclick="app.toggleToolbarPanel('registerToolbar')" title="Search &amp; filters">⚙️</button>
+            <div class="toolbar-panel">
             <input autocomplete="off" type="text" class="filter-input search-compact" id="searchInput" placeholder="Search tasks..." oninput="app.debouncedRender()">
             
             <div class="toolbar-filters">
@@ -1412,6 +1444,7 @@
                 <select class="filter-select" id="filterPending" onchange="app.renderTable()"><option value="All">All People</option></select>
                 <select class="filter-select" id="filterDue" onchange="app.renderTable()">
                     <option value="All">Any Due Date</option>
+                    <option value="AsOfToday">Pending as of Today</option>
                     <option value="Overdue">Overdue</option>
                     <option value="Today">Today</option>
                     <option value="Tomorrow">Tomorrow</option>
@@ -1432,6 +1465,7 @@
                 <button class="btn-icon" onclick="app.printRegister()" title="Print">🖨️</button>
                 <button class="btn-icon" onclick="app.openEmailModal()" title="Mail">📧</button>
                 <button class="btn-new-entry" onclick="app.openTaskModal()" title="New Entry">＋</button>
+            </div>
             </div>
         </div>
 
@@ -1467,6 +1501,8 @@
     <!-- HOLIDAYS TAB -->
     <div class="content-area" id="holidaysTab">
         <div class="toolbar-row single-line-toolbar" id="holidaysToolbar">
+            <button type="button" class="toolbar-gear-btn" onclick="app.toggleToolbarPanel('holidaysToolbar')" title="Search &amp; filters">⚙️</button>
+            <div class="toolbar-panel">
             <input autocomplete="off" type="text" class="filter-input search-compact" id="searchHolidays" placeholder="Search holidays..." oninput="app.renderHolidays()">
             <div class="toolbar-filters">
                 <select class="filter-select" id="filterHolidayType" onchange="app.renderHolidays()" title="Holiday Calendar">
@@ -1483,6 +1519,7 @@
             <div class="toolbar-actions">
                 <button class="btn-icon view-toggle" onclick="app.toggleViewMode()" title="Switch between table and cards">▦</button>
                 <button class="btn-new-entry" onclick="app.openHolidayModal()" title="Add Holiday">＋</button>
+            </div>
             </div>
         </div>
 
@@ -1517,6 +1554,8 @@
     <!-- COMPLETED TAB -->
     <div class="content-area" id="completedTab">
         <div class="toolbar-row single-line-toolbar" id="completedToolbar">
+            <button type="button" class="toolbar-gear-btn" onclick="app.toggleToolbarPanel('completedToolbar')" title="Search &amp; filters">⚙️</button>
+            <div class="toolbar-panel">
             <input autocomplete="off" type="text" class="filter-input search-compact" id="searchCompleted" placeholder="Search completed..." oninput="app.debouncedRender()">
             
             <div class="toolbar-filters">
@@ -1531,6 +1570,7 @@
                 <button class="btn-icon view-toggle" onclick="app.toggleViewMode()" title="Switch between table and cards">▦</button>
                 <button class="btn-icon" id="sortToggleCompleted" onclick="app.openSortMenu('Completed', this)" title="Sort">🔃</button>
                 <button class="btn-icon" onclick="app.fitColumns('completed')" title="Fit Columns">⤢</button>
+            </div>
             </div>
         </div>
 
@@ -1557,11 +1597,14 @@
     <!-- BIN TAB -->
     <div class="content-area" id="binTab">
         <div class="toolbar-row single-line-toolbar" id="binToolbar">
+            <button type="button" class="toolbar-gear-btn" onclick="app.toggleToolbarPanel('binToolbar')" title="Actions">⚙️</button>
+            <div class="toolbar-panel">
             <div class="toolbar-actions" style="margin-left: 0;">
                 <button class="btn-icon select-toggle" onclick="app.toggleSelectMode()" title="Select several entries">☑</button>
                 <button class="btn-icon view-toggle" onclick="app.toggleViewMode()" title="Switch between table and cards">▦</button>
                 <button class="btn-icon" id="sortToggleBin" onclick="app.openSortMenu('Bin', this)" title="Sort">🔃</button>
                 <button class="btn-icon" onclick="app.fitColumns('bin')" title="Fit Columns">⤢</button>
+            </div>
             </div>
         </div>
 
@@ -1692,6 +1735,7 @@
                 <button class="sheet-item" onclick="app.openListManager('categories')"><span class="ico">⚙️</span>Lists</button>
                 <button class="sheet-item" onclick="app.openEmailModal()"><span class="ico">📥</span>Fetch Mail</button>
                 <button class="sheet-item" onclick="app.testAlarmSound()"><span class="ico">🔔</span>Test Alarm</button>
+                <button class="sheet-item" onclick="app.openActivityLog()"><span class="ico">📋</span>Activity Log</button>
             </div>
         </div>
 
@@ -1822,6 +1866,22 @@
             <div class="lm-foot">
                 <button type="button" onclick="app.clearList()" class="btn-modal danger">Clear This List</button>
                 <button type="button" onclick="app.closeListManager()" class="btn-modal secondary">Done</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ACTIVITY LOG MODAL -->
+    <div class="modal" id="activityLogModal">
+        <div class="modal-content modal-sm">
+            <div class="modal-header">
+                <h2>Activity Log</h2>
+                <button class="modal-close" onclick="app.closeActivityLog()">✕</button>
+            </div>
+            <p class="cfg-hint" style="margin: -6px 0 12px;">What's happened in this app on this device, most recent first.</p>
+            <div id="activityLogList" class="log-list"></div>
+            <div class="modal-buttons">
+                <button type="button" class="btn-modal secondary" onclick="app.clearActivityLog()">Clear Log</button>
+                <button type="button" class="btn-modal primary" onclick="app.closeActivityLog()">Close</button>
             </div>
         </div>
     </div>
