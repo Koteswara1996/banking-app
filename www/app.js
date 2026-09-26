@@ -240,6 +240,7 @@ const app = {
         this.watchAutofill();
         this.loadLists();
         this.loadData();
+        this.repairListsFromTaskData();
         this.loadHolidays();
         this.purgeOldBin();
         this.initViewMode();
@@ -1104,10 +1105,31 @@ const app = {
                         <input type="time" id="reschedTime_${idAttr}" value="${this.escAttr(task.dueTime)}" style="font-size: 0.84rem; color: var(--label); background: transparent; border: none; outline: none; padding: 4px;">
                         <button type="button" class="btn-row go" data-action="alarm-reschedule" data-id="${idAttr}" style="padding: 6px 12px; font-size: 0.78rem; font-weight: 600; color: var(--blue-ink); background: rgba(37, 99, 235, 0.1); border: 1px solid rgba(37, 99, 235, 0.2); border-radius: 10px; cursor: pointer;">Move</button>
                     </span>
+                    <span class="alarm-field" style="display: flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 10px; background: var(--input-bg); border: 1px solid var(--line);">
+                        <select id="alarmRec_${idAttr}" onchange="app.changeAlarmRecurrence('${idAttr}', this.value)" style="font-size: 0.84rem; font-weight: 600; color: var(--violet-ink); background: transparent; border: none; outline: none; padding: 4px; cursor: pointer;">
+                            <option value="None"${(task.recurrence === 'None' || !task.recurrence) ? ' selected' : ''}>Doesn't repeat</option>
+                            <option value="Daily"${task.recurrence === 'Daily' ? ' selected' : ''}>Daily</option>
+                            <option value="Weekly"${task.recurrence === 'Weekly' ? ' selected' : ''}>Weekly</option>
+                            <option value="Monthly"${task.recurrence === 'Monthly' ? ' selected' : ''}>Monthly</option>
+                        </select>
+                    </span>
                 </div>
             `;
             container.appendChild(el);
         });
+    },
+
+    // Lets a recurrence be changed right from the overdue-alert popup,
+    // without opening the full Task modal. Only affects future occurrences
+    // generated the next time this task is marked done.
+    changeAlarmRecurrence(taskId, val) {
+        const task = this.findTask(taskId);
+        if (!task) return;
+        task.recurrence = val || 'None';
+        task.updatedAt = Date.now();
+        this.saveData();
+        this.renderTable();
+        this.showToast('Recurrence set to ' + (task.recurrence === 'None' ? "doesn't repeat" : task.recurrence), 'success');
     },
 
     alarmAction(action, taskId) {
@@ -1444,7 +1466,8 @@ const app = {
             categories: [],
             priorities: ['High', 'Medium', 'Low'],
             statuses: ['Pending', 'In-Progress', 'Completed'],
-            pendingWith: ['Self', 'Banking Team', 'Finance Manager', 'Vendor', 'Customer']
+            pendingWith: ['Self', 'Banking Team', 'Finance Manager', 'Vendor', 'Customer'],
+            subCategories: []
         };
         try {
             let stored = localStorage.getItem(CONFIG.LISTS_KEY);
@@ -1456,16 +1479,6 @@ const app = {
             this.lists = stored ? Object.assign({}, defaultLists, JSON.parse(stored)) : defaultLists;
         } catch (e) { this.lists = defaultLists; }
         this.listsUpdatedAt = Number(localStorage.getItem(CONFIG.LISTS_TS_KEY)) || 0;
-
-        if (!localStorage.getItem('pureEnergyCatsCleared')) {
-            localStorage.setItem('pureEnergyCatsCleared', '1');
-            if (this.lists.categories && this.lists.categories.length) {
-                this.lists.categories = [];
-                this.listsUpdatedAt = Date.now();
-                localStorage.setItem(CONFIG.LISTS_TS_KEY, String(this.listsUpdatedAt));
-                localStorage.setItem(CONFIG.LISTS_KEY, JSON.stringify(this.lists));
-            }
-        }
     },
 
     saveLists(bump = true) {
@@ -1479,10 +1492,43 @@ const app = {
         if (bump) this.syncToGoogleSheets();
     },
 
+    // Self-heals the option lists (Category, Priority, Status, Pending With)
+    // from what your actual tasks are using. The Filter dropdowns already
+    // did this at display time via a "union" with this.tasks, so real
+    // category/priority/status/pendingWith values were never actually lost
+    // — they just weren't showing up in the entry screen's dropdown or its
+    // "Edit" list manager after a list got emptied (see the removed
+    // one-time-wipe code this replaces). This makes that recovery
+    // permanent: it writes the real values back into the saved list itself.
+    repairListsFromTaskData() {
+        const fieldsToHeal = [
+            ['categories', 'category'],
+            ['priorities', 'priority'],
+            ['statuses', 'status'],
+            ['pendingWith', 'pendingWith'],
+            ['subCategories', 'subCategory']
+        ];
+        let changed = false;
+
+        fieldsToHeal.forEach(([listKey, taskField]) => {
+            if (!Array.isArray(this.lists[listKey])) this.lists[listKey] = [];
+            this.tasks.forEach(t => {
+                if (t.purged) return;
+                const v = t[taskField];
+                if (v && this.lists[listKey].indexOf(v) === -1) {
+                    this.lists[listKey].push(v);
+                    changed = true;
+                }
+            });
+        });
+
+        if (changed) this.saveLists(true);
+    },
+
     openListManager(key) {
         this.editingListKey = key;
         document.getElementById('listSelector').value = key;
-        const titles = { categories: "Categories", priorities: "Priorities", statuses: "Status Options", pendingWith: "Pending With" };
+        const titles = { categories: "Categories", priorities: "Priorities", statuses: "Status Options", pendingWith: "Pending With", subCategories: "Sub Categories" };
         document.getElementById('listManagerTitle').textContent = `Manage ${titles[key]}`;
         this.renderListManagerItems();
         document.getElementById('listManagerModal').classList.add('open');
@@ -1490,7 +1536,7 @@ const app = {
 
     switchListManager() {
         this.editingListKey = document.getElementById('listSelector').value;
-        const titles = { categories: "Categories", priorities: "Priorities", statuses: "Status Options", pendingWith: "Pending With" };
+        const titles = { categories: "Categories", priorities: "Priorities", statuses: "Status Options", pendingWith: "Pending With", subCategories: "Sub Categories" };
         document.getElementById('listManagerTitle').textContent = `Manage ${titles[this.editingListKey]}`;
         this.renderListManagerItems();
     },
@@ -1939,10 +1985,33 @@ const app = {
 
     populateDropdowns() {
         const opt = (v) => `<option value="${this.escAttr(v)}">${this.sanitize(v)}</option>`;
-        document.getElementById('taskCategory').innerHTML = '<option value="">Select Category</option>' + this.lists.categories.map(opt).join('');
-        document.getElementById('taskPriority').innerHTML = this.lists.priorities.map(opt).join('');
-        document.getElementById('taskStatus').innerHTML = this.lists.statuses.map(opt).join('');
-        document.getElementById('taskPendingWith').innerHTML = '<option value="">Select Person</option>' + this.lists.pendingWith.map(opt).join('');
+
+        // Rebuilding a <select>'s innerHTML wipes whatever it currently shows.
+        // populateDropdowns() is also called by background cloud syncs (see
+        // pullTasksFromCloud), so without restoring the value here, a sync
+        // landing while the Task modal is open silently resets every
+        // dropdown in it back to its first option. A value can also be
+        // showing that isn't in this.lists at all — when editing a task
+        // whose stored category/priority/status/pendingWith was since
+        // removed from Settings → Lists, openTaskModal's setSelectValue()
+        // adds it as a one-off <option> so the task's real data isn't
+        // silently altered; re-add it here too, or it's just as reset as if
+        // we hadn't preserved anything.
+        const keepSelect = (elId, html) => {
+            const el = document.getElementById(elId);
+            if (!el) return;
+            const previous = el.value;
+            el.innerHTML = html;
+            if (!previous) return;
+            if (!Array.from(el.options).some(o => o.value === previous)) el.add(new Option(previous, previous));
+            el.value = previous;
+        };
+
+        keepSelect('taskCategory', '<option value="">Select Category</option>' + this.lists.categories.map(opt).join(''));
+        keepSelect('taskPriority', this.lists.priorities.map(opt).join(''));
+        keepSelect('taskStatus', this.lists.statuses.map(opt).join(''));
+        keepSelect('taskPendingWith', '<option value="">Select Person</option>' + this.lists.pendingWith.map(opt).join(''));
+        keepSelect('taskSubCategory', '<option value="">Select Sub Category</option>' + (this.lists.subCategories || []).map(opt).join(''));
 
         const union = (base, field) => {
             const out = [].concat(base);
@@ -3154,11 +3223,13 @@ const app = {
             this.setSelectValue('taskPriority', t.priority || '');
             this.setSelectValue('taskStatus', t.status || '');
             this.setSelectValue('taskPendingWith', t.pendingWith || '');
+            this.setSelectValue('taskSubCategory', t.subCategory || '');
             document.getElementById('taskDueDate').value = t.dueDate || '';
             document.getElementById('taskDueTime').value = t.dueTime || '';
             document.getElementById('taskMailChain').value = t.mailChain || '';
             document.getElementById('taskRecurrence').value = t.recurrence || 'None';
             document.getElementById('taskNotes').value = t.notes || '';
+            this.renderPaymentDetails(t.paymentDetails);
             if (delBtn) delBtn.style.display = t.deleted ? 'none' : '';
         } else {
             this.editingId = null;
@@ -3170,6 +3241,7 @@ const app = {
             this.setSelectValue('taskPriority', pri);
             this.setSelectValue('taskStatus', stat);
             document.getElementById('taskRecurrence').value = 'None';
+            this.renderPaymentDetails({});
             if (delBtn) delBtn.style.display = 'none';
         }
 
@@ -3194,6 +3266,91 @@ const app = {
         this.storedEmailId = null;
     },
 
+    /* ---------- CONDITIONAL PAYMENT FIELDS ----------
+       Category = Domestic Payment + Status = Completed -> PO Number /
+       Invoice(s) / Narration. Category = Import Payment + Status = In
+       Progress -> Payment % / Payment Type / Payment Against. Matched
+       loosely (case-insensitive, keyword-based) so this still works
+       whatever the exact category/status names in your list are. */
+    isDomesticPaymentCategory(cat) {
+        return /domestic/i.test(cat || '') && /payment/i.test(cat || '');
+    },
+
+    isImportPaymentCategory(cat) {
+        return /import/i.test(cat || '') && /payment/i.test(cat || '');
+    },
+
+    isUrgentPaymentCategory(cat) {
+        return /urgent/i.test(cat || '') && /payment/i.test(cat || '');
+    },
+
+    isCompletedStatus(status) {
+        return String(status || '').toLowerCase().replace(/[^a-z]/g, '') === 'completed';
+    },
+
+    isInProgressStatus(status) {
+        return String(status || '').toLowerCase().replace(/[^a-z]/g, '') === 'inprogress';
+    },
+
+    updateConditionalFields() {
+        const cat = document.getElementById('taskCategory').value;
+        const status = document.getElementById('taskStatus').value;
+
+        const domesticBox = document.getElementById('domesticCompletedFields');
+        const importBox = document.getElementById('importInProgressFields');
+        const subCategoryBox = document.getElementById('subCategoryField');
+
+        const showDomestic = this.isDomesticPaymentCategory(cat) && this.isCompletedStatus(status);
+        const showImport = this.isImportPaymentCategory(cat) && this.isInProgressStatus(status);
+        // Sub Category isn't tied to status — shown for Domestic Payments or
+        // Urgent Payments regardless of what status the entry is in.
+        const showSubCategory = this.isDomesticPaymentCategory(cat) || this.isUrgentPaymentCategory(cat);
+
+        if (domesticBox) domesticBox.style.display = showDomestic ? '' : 'none';
+        if (importBox) importBox.style.display = showImport ? '' : 'none';
+        if (subCategoryBox) subCategoryBox.style.display = showSubCategory ? '' : 'none';
+    },
+
+    renderPaymentDetails(pd) {
+        pd = pd || {};
+        document.getElementById('pdPoNumber').value = pd.poNumber || '';
+        document.getElementById('pdInvoiceNumbers').value = pd.invoiceNumbers || '';
+        document.getElementById('pdNarration').value = pd.narration || '';
+        document.getElementById('pdPaymentPercent').value = pd.paymentPercent || '';
+        this.setSelectValue('pdPaymentType', pd.paymentType || '');
+        this.setSelectValue('pdPaymentAgainst', pd.paymentAgainst || '');
+        this.updateConditionalFields();
+    },
+
+    collectPaymentDetails() {
+        return {
+            poNumber: document.getElementById('pdPoNumber').value.trim(),
+            invoiceNumbers: document.getElementById('pdInvoiceNumbers').value.trim(),
+            narration: document.getElementById('pdNarration').value.trim(),
+            paymentPercent: document.getElementById('pdPaymentPercent').value.trim(),
+            paymentType: document.getElementById('pdPaymentType').value,
+            paymentAgainst: document.getElementById('pdPaymentAgainst').value
+        };
+    },
+
+    // Returns an error message if a required conditional field is missing
+    // for the category+status combo currently selected, or '' if fine.
+    validatePaymentDetails(fields) {
+        if (this.isDomesticPaymentCategory(fields.category) && this.isCompletedStatus(fields.status)) {
+            const pd = this.collectPaymentDetails();
+            if (!pd.poNumber || !pd.invoiceNumbers || !pd.narration) {
+                return 'Domestic Payment marked Completed needs a PO Number, Invoice(s), and Narration.';
+            }
+        }
+        if (this.isImportPaymentCategory(fields.category) && this.isInProgressStatus(fields.status)) {
+            const pd = this.collectPaymentDetails();
+            if (!pd.paymentPercent || !pd.paymentType || !pd.paymentAgainst) {
+                return 'Import Payment marked In Progress needs Payment %, Payment Type, and Payment Against.';
+            }
+        }
+        return '';
+    },
+
     saveTask(e) {
         if (e && e.preventDefault) e.preventDefault();
 
@@ -3203,6 +3360,7 @@ const app = {
         const fields = {
             description: desc,
             category: document.getElementById('taskCategory').value,
+            subCategory: document.getElementById('taskSubCategory').value,
             priority: document.getElementById('taskPriority').value,
             status: document.getElementById('taskStatus').value || 'Pending',
             pendingWith: document.getElementById('taskPendingWith').value,
@@ -3211,8 +3369,12 @@ const app = {
             mailChain: document.getElementById('taskMailChain').value.trim(),
             recurrence: document.getElementById('taskRecurrence').value || 'None',
             notes: document.getElementById('taskNotes').value,
+            paymentDetails: this.collectPaymentDetails(),
             updatedAt: Date.now()
         };
+
+        const paymentError = this.validatePaymentDetails(fields);
+        if (paymentError) { this.showToast(paymentError, 'warning'); return; }
 
         const clash = this.slotClash(fields.dueDate, fields.dueTime, this.editingId);
         if (clash) {

@@ -1768,21 +1768,69 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label>Category <a href="#" class="edit-options-btn" onclick="app.openListManager('categories'); return false;">Edit</a></label>
-                        <select id="taskCategory"><option value="">Select category</option></select>
+                        <select id="taskCategory" onchange="app.updateConditionalFields()"><option value="">Select category</option></select>
                     </div>
                     <div class="form-group">
                         <label>Priority <a href="#" class="edit-options-btn" onclick="app.openListManager('priorities'); return false;">Edit</a></label>
                         <select id="taskPriority"></select>
                     </div>
                 </div>
+                <div class="form-group" id="subCategoryField" style="display:none;">
+                    <label>Sub Category <a href="#" class="edit-options-btn" onclick="app.openListManager('subCategories'); return false;">Edit</a></label>
+                    <select id="taskSubCategory"><option value="">Select Sub Category</option></select>
+                </div>
                 <div class="form-row">
                     <div class="form-group">
                         <label>Status <a href="#" class="edit-options-btn" onclick="app.openListManager('statuses'); return false;">Edit</a></label>
-                        <select id="taskStatus"></select>
+                        <select id="taskStatus" onchange="app.updateConditionalFields()"></select>
                     </div>
                     <div class="form-group">
                         <label>Pending With <a href="#" class="edit-options-btn" onclick="app.openListManager('pendingWith'); return false;">Edit</a></label>
                         <select id="taskPendingWith"><option value="">Select person</option></select>
+                    </div>
+                </div>
+                <div id="domesticCompletedFields" style="display:none;">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>PO Number</label>
+                            <input autocomplete="off" type="text" id="pdPoNumber" placeholder="e.g. PO-4521">
+                        </div>
+                        <div class="form-group">
+                            <label>Invoice(s)</label>
+                            <input autocomplete="off" type="text" id="pdInvoiceNumbers" placeholder="e.g. INV-1001, INV-1002">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Narration</label>
+                        <textarea id="pdNarration" placeholder="Narration for this payment..."></textarea>
+                    </div>
+                </div>
+                <div id="importInProgressFields" style="display:none;">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Payment %</label>
+                            <input autocomplete="off" type="number" id="pdPaymentPercent" min="0" max="100" placeholder="e.g. 30">
+                        </div>
+                        <div class="form-group">
+                            <label>Payment Type</label>
+                            <select id="pdPaymentType">
+                                <option value="">Select</option>
+                                <option value="Advance">Advance</option>
+                                <option value="Balance">Balance</option>
+                                <option value="Remaining Balance">Remaining Balance</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Payment Against</label>
+                        <select id="pdPaymentAgainst">
+                            <option value="">Select</option>
+                            <option value="Before Dispatch">Before Dispatch</option>
+                            <option value="Before Production">Before Production</option>
+                            <option value="Against BOE">Against BOE</option>
+                            <option value="Against BL">Against BL</option>
+                            <option value="Against CI">Against CI</option>
+                        </select>
                     </div>
                 </div>
                 <div class="form-group">
@@ -1856,6 +1904,7 @@
                     <option value="priorities">Priorities</option>
                     <option value="statuses">Statuses</option>
                     <option value="pendingWith">Pending with</option>
+                    <option value="subCategories">Sub Categories</option>
                 </select>
             </div>
             <div id="listManagerItems"></div>
