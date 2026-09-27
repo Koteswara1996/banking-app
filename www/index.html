@@ -1068,6 +1068,22 @@
         .chip.hol-other { color: var(--violet-ink); background: rgba(175,82,222,0.08); border-color: rgba(175,82,222,0.18); }
         .chip.hol-weekend { color: var(--red-ink); background: rgba(255,59,48,0.1); border-color: rgba(255,59,48,0.22); font-weight: 800; }
 
+        /* ── KEY POINTS (task modal) ─────────────────────────────── */
+        .kp-add-btn {
+            flex: 0 0 auto; padding: 4px 12px; font-size: 0.76rem; font-weight: 700;
+            color: var(--accent); background: var(--fill); border: 1px solid var(--glass-border-subtle);
+            border-radius: 10px; cursor: pointer;
+        }
+        #taskKeyPoints { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+        .keypoint-row { display: flex; gap: 8px; align-items: center; }
+        .keypoint-row .kp-key { flex: 0 0 38%; }
+        .keypoint-row .kp-value { flex: 1 1 auto; min-width: 0; }
+        .keypoint-row input { padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--input-bg); color: var(--label); font-size: 0.86rem; }
+        .keypoint-row .kp-remove { flex: 0 0 auto; }
+        html[data-shell="mobile"] .keypoint-row { flex-wrap: wrap; }
+        html[data-shell="mobile"] .keypoint-row .kp-key,
+        html[data-shell="mobile"] .keypoint-row .kp-value { flex: 1 1 100%; }
+
         @media (max-width: 420px) {
             .stat-grid { grid-template-columns: repeat(2, 1fr); }
             .mini-grid { grid-template-columns: repeat(2, 1fr); }
@@ -1679,6 +1695,49 @@
         </div>
 
         <div class="cfg-section">
+            <div class="dash-title">General Activity Log</div>
+            <p class="cfg-hint">Task activity (created, edited, completed...) logs itself automatically. Use this for anything that never became a task — this feeds the Daily AI Report below alongside it.</p>
+            <div class="form-group" style="margin-bottom:10px;">
+                <input autocomplete="off" type="text" id="generalLogActivity" placeholder="What did you do? (e.g. Called vendor about delayed shipment)">
+            </div>
+            <div class="form-group" style="margin-bottom:10px;">
+                <textarea id="generalLogDetails" placeholder="Any extra details (optional)" style="min-height:60px;"></textarea>
+            </div>
+            <button class="sheet-item" style="width:100%;" onclick="app.logGeneralActivity()"><span class="ico">📝</span>Log this activity</button>
+        </div>
+
+        <div class="cfg-section">
+            <div class="dash-title">Fixed Daily Activities</div>
+            <p class="cfg-hint">Standing things you do every working day (e.g. "Daily NOSTRO reconciliation"). Included in every Daily AI Report automatically while active — no need to log them separately each day.</p>
+            <div style="display:flex; gap:8px; margin-bottom:12px;">
+                <input autocomplete="off" type="text" id="newFixedTaskInput" placeholder="Add a standing activity..." style="flex:1;">
+                <button class="btn-icon" onclick="app.addFixedTask()" title="Add" style="flex:0 0 auto; width:44px;">＋</button>
+            </div>
+            <div id="fixedTasksList"></div>
+        </div>
+
+        <div class="cfg-section">
+            <div class="dash-title">Report Style Samples</div>
+            <p class="cfg-hint">Paste in reports you've written by hand before, so the AI report below matches how you actually write — not a generic template. The most recent 3 are used each time.</p>
+            <textarea id="newReportSampleInput" placeholder="Paste a past report you wrote, as-is..." style="min-height:90px; margin-bottom:10px;"></textarea>
+            <button class="sheet-item" style="width:100%; margin-bottom:12px;" onclick="app.addReportSample()"><span class="ico">💾</span>Save Sample</button>
+            <div id="reportSamplesList"></div>
+        </div>
+
+        <div class="cfg-section">
+            <div class="dash-title">Daily AI Report</div>
+            <p class="cfg-hint">Summarizes the day's logged task and general activity, in your own reporting style, written by Gemini. Needs Cloud Sync and a Gemini key set up on your Apps Script.</p>
+            <div style="display:flex; gap:8px; margin-bottom:12px; align-items:center;">
+                <input autocomplete="off" type="date" id="reportDateInput" style="flex:1;">
+                <button class="sheet-item" style="flex:0 0 auto; width:auto; padding:0 18px;" onclick="app.generateDailyReport()"><span class="ico">✨</span>Generate</button>
+            </div>
+            <div id="dailyReportBox" style="display:none;">
+                <div id="dailyReportText" style="white-space:pre-wrap; font-size:0.86rem; line-height:1.5; padding:14px; background:var(--fill); border-radius:12px; border:1px solid var(--glass-border-subtle); margin-bottom:10px;"></div>
+                <button class="sheet-item" style="width:100%;" onclick="app.copyReportText()"><span class="ico">📋</span>Copy report text</button>
+            </div>
+        </div>
+
+        <div class="cfg-section">
             <div class="dash-title">Data Backup</div>
             <div class="sheet-grid">
                 <button class="sheet-item" onclick="app.exportData('csv')"><span class="ico">💾</span>Export CSV</button>
@@ -1860,6 +1919,13 @@
                 <div class="form-group">
                     <label>Notes</label>
                     <textarea autocomplete="off" id="taskNotes" placeholder="Additional notes or context..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label style="display:flex; align-items:center; justify-content:space-between;">
+                        <span>Key Points <span style="font-weight:400; text-transform:none; letter-spacing:0; color:var(--label-2);">(optional structured notes — amount, ref no., etc.)</span></span>
+                        <button type="button" class="kp-add-btn" onclick="app.addKeyPointRow()">+ Add</button>
+                    </label>
+                    <div id="taskKeyPoints"></div>
                 </div>
                 <div class="modal-buttons">
                     <button type="button" class="btn-modal secondary" id="viewOriginalEmailBtn" style="display:none;" onclick="app.openStoredEmail()">Open Mail</button>

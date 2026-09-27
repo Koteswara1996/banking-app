@@ -257,6 +257,10 @@ const app = {
         this.renderNudgeSettings();
         this.renderSlotSettings();
         this.renderPushStatus();
+        this.renderFixedTasks();
+        this.renderReportSamples();
+        const reportDateEl = document.getElementById('reportDateInput');
+        if (reportDateEl && !reportDateEl.value) reportDateEl.value = this.getLocalDateStr(new Date());
         this.switchTab('Dashboard');
         this.setupEventListeners();
 
@@ -2523,6 +2527,184 @@ const app = {
         this.showToast('Activity log cleared', 'info');
     },
 
+    // Records a task lifecycle event both locally (the on-device Activity
+    // Log above) and on the server (TaskActivityLog sheet), where it feeds
+    // the Daily AI Report. The server call is fire-and-forget — if Cloud
+    // Sync isn't set up, or the request fails, the task action you just
+    // took still completes normally; nothing here can block or undo it.
+    logTaskActivity(action, task, details) {
+        this.logActivity(action + ': "' + task.description + '"' + (details ? ' — ' + details : ''));
+        if ((localStorage.getItem(CONFIG.SYNC_URL_KEY) || '').trim()) {
+            this.cloudRequest({
+                action: 'logActivity', logType: 'task',
+                entry: { taskId: task.id, taskDescription: task.description, action: action, details: details || '' }
+            }).catch(() => {});
+        }
+    },
+
+    // The General Activity Log's own entry point (Config) — for anything
+    // that never became a task at all. Not fire-and-forget: the person
+    // typed this in specifically to save it, so real success/failure
+    // feedback matters here, unlike the automatic task-event logging above.
+    async logGeneralActivity() {
+        const activityEl = document.getElementById('generalLogActivity');
+        const detailsEl = document.getElementById('generalLogDetails');
+        const activity = activityEl.value.trim();
+        if (!activity) { this.showToast('Enter what you did first.', 'warning'); return; }
+        if (!(localStorage.getItem(CONFIG.SYNC_URL_KEY) || '').trim()) {
+            this.showToast('Set up Cloud Sync first — the activity log is stored through your Apps Script.', 'warning');
+            return;
+        }
+        try {
+            const res = await this.cloudRequest({ action: 'logActivity', logType: 'general', entry: { activity: activity, details: detailsEl.value.trim() } });
+            if (!res || res.status !== 'success') throw new Error((res && res.message) || 'Save failed');
+            activityEl.value = '';
+            detailsEl.value = '';
+            this.showToast('Logged.', 'success');
+        } catch (e) {
+            this.showToast('Could not log that: ' + (e.message || e), 'error');
+        }
+    },
+
+    /* ---------- FIXED DAILY ACTIVITIES ---------- */
+    async renderFixedTasks() {
+        const box = document.getElementById('fixedTasksList');
+        if (!box) return;
+        if (!(localStorage.getItem(CONFIG.SYNC_URL_KEY) || '').trim()) {
+            box.innerHTML = '<div class="empty-state"><strong>Set up Cloud Sync first</strong><span>Standing activities are stored through your Apps Script.</span></div>';
+            return;
+        }
+        try {
+            const res = await this.cloudRequest({ action: 'listFixedTasks' });
+            const items = (res && res.fixedTasks) || [];
+            if (!items.length) {
+                box.innerHTML = '<div class="empty-state"><strong>None yet</strong><span>Add a standing activity above.</span></div>';
+                return;
+            }
+            box.innerHTML = items.map(f => `
+                <div class="log-row" style="flex-direction:row; align-items:center; justify-content:space-between; gap:10px;">
+                    <span class="log-msg" style="${f.active ? '' : 'opacity:0.5; text-decoration:line-through;'}">${this.sanitize(f.description)}</span>
+                    <div style="display:flex; gap:6px; flex:0 0 auto;">
+                        <button type="button" class="btn-icon" onclick="app.toggleFixedTaskUI('${this.escAttr(f.id)}', ${!f.active})" title="${f.active ? 'Pause' : 'Resume'}">${f.active ? '⏸️' : '▶️'}</button>
+                        <button type="button" class="btn-icon bad" onclick="app.deleteFixedTaskUI('${this.escAttr(f.id)}')" title="Delete">${this.SVGS.bin}</button>
+                    </div>
+                </div>
+            `).join('');
+        } catch (e) {
+            box.innerHTML = '<div class="empty-state"><strong>Could not load</strong><span>' + this.sanitize(e.message || String(e)) + '</span></div>';
+        }
+    },
+
+    async addFixedTask() {
+        const input = document.getElementById('newFixedTaskInput');
+        const description = input.value.trim();
+        if (!description) return;
+        if (!(localStorage.getItem(CONFIG.SYNC_URL_KEY) || '').trim()) { this.showToast('Set up Cloud Sync first.', 'warning'); return; }
+        try {
+            const res = await this.cloudRequest({ action: 'saveFixedTask', description });
+            if (!res || res.status !== 'success') throw new Error((res && res.message) || 'Save failed');
+            input.value = '';
+            this.renderFixedTasks();
+            this.showToast('Added.', 'success');
+        } catch (e) {
+            this.showToast('Could not add: ' + (e.message || e), 'error');
+        }
+    },
+
+    async toggleFixedTaskUI(id, active) {
+        try {
+            await this.cloudRequest({ action: 'toggleFixedTask', id, active });
+            this.renderFixedTasks();
+        } catch (e) {
+            this.showToast('Could not update: ' + (e.message || e), 'error');
+        }
+    },
+
+    async deleteFixedTaskUI(id) {
+        if (!confirm('Delete this standing activity?')) return;
+        try {
+            await this.cloudRequest({ action: 'deleteFixedTask', id });
+            this.renderFixedTasks();
+            this.showToast('Deleted.', 'info');
+        } catch (e) {
+            this.showToast('Could not delete: ' + (e.message || e), 'error');
+        }
+    },
+
+    /* ---------- REPORT STYLE SAMPLES ---------- */
+    async renderReportSamples() {
+        const box = document.getElementById('reportSamplesList');
+        if (!box) return;
+        if (!(localStorage.getItem(CONFIG.SYNC_URL_KEY) || '').trim()) { box.innerHTML = ''; return; }
+        try {
+            const res = await this.cloudRequest({ action: 'listReportSamples' });
+            const items = (res && res.samples) || [];
+            if (!items.length) {
+                box.innerHTML = '<div class="empty-state"><strong>No samples saved yet</strong><span>Paste one above.</span></div>';
+                return;
+            }
+            box.innerHTML = items.map(s => `
+                <div class="log-row" style="flex-direction:row; align-items:flex-start; justify-content:space-between; gap:10px;">
+                    <span class="log-msg" style="display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">${this.sanitize(s.sampleText)}</span>
+                    <button type="button" class="btn-icon bad" onclick="app.deleteReportSampleUI('${this.escAttr(s.id)}')" title="Delete" style="flex:0 0 auto;">${this.SVGS.bin}</button>
+                </div>
+            `).join('');
+        } catch (e) {
+            box.innerHTML = '';
+        }
+    },
+
+    async addReportSample() {
+        const input = document.getElementById('newReportSampleInput');
+        const sampleText = input.value.trim();
+        if (!sampleText) return;
+        if (!(localStorage.getItem(CONFIG.SYNC_URL_KEY) || '').trim()) { this.showToast('Set up Cloud Sync first.', 'warning'); return; }
+        try {
+            const res = await this.cloudRequest({ action: 'saveReportSample', sampleText });
+            if (!res || res.status !== 'success') throw new Error((res && res.message) || 'Save failed');
+            input.value = '';
+            this.renderReportSamples();
+            this.showToast('Sample saved.', 'success');
+        } catch (e) {
+            this.showToast('Could not save: ' + (e.message || e), 'error');
+        }
+    },
+
+    async deleteReportSampleUI(id) {
+        if (!confirm('Delete this sample?')) return;
+        try {
+            await this.cloudRequest({ action: 'deleteReportSample', id });
+            this.renderReportSamples();
+            this.showToast('Deleted.', 'info');
+        } catch (e) {
+            this.showToast('Could not delete: ' + (e.message || e), 'error');
+        }
+    },
+
+    /* ---------- DAILY AI REPORT ---------- */
+    async generateDailyReport() {
+        const dateInput = document.getElementById('reportDateInput');
+        const date = dateInput.value || this.getLocalDateStr(new Date());
+        if (!(localStorage.getItem(CONFIG.SYNC_URL_KEY) || '').trim()) { this.showToast('Set up Cloud Sync first.', 'warning'); return; }
+
+        this.showToast('Generating report...', 'info');
+        try {
+            const res = await this.cloudRequest({ action: 'generateDailyReport', date });
+            if (!res || res.status !== 'success') throw new Error((res && res.message) || 'Report generation failed');
+            document.getElementById('dailyReportText').textContent = res.report;
+            document.getElementById('dailyReportBox').style.display = '';
+            this.showToast('Report ready.', 'success');
+        } catch (e) {
+            this.showToast(e.message || String(e), 'error');
+        }
+    },
+
+    copyReportText() {
+        const text = document.getElementById('dailyReportText').textContent;
+        this.copyToClipboard(text);
+        this.showToast('Copied.', 'success');
+    },
+
     holidayCalendars() {
         const set = new Set(['USD Holiday', 'Indian Bank Holiday']);
         this.holidays.forEach(h => { if (h.type) set.add(h.type); });
@@ -3230,6 +3412,7 @@ const app = {
             document.getElementById('taskRecurrence').value = t.recurrence || 'None';
             document.getElementById('taskNotes').value = t.notes || '';
             this.renderPaymentDetails(t.paymentDetails);
+            this.renderKeyPoints(t.keyPoints);
             if (delBtn) delBtn.style.display = t.deleted ? 'none' : '';
         } else {
             this.editingId = null;
@@ -3242,6 +3425,7 @@ const app = {
             this.setSelectValue('taskStatus', stat);
             document.getElementById('taskRecurrence').value = 'None';
             this.renderPaymentDetails({});
+            this.renderKeyPoints([]);
             if (delBtn) delBtn.style.display = 'none';
         }
 
@@ -3351,6 +3535,37 @@ const app = {
         return '';
     },
 
+    /* ---------- KEY POINTS (structured key/value fields per task, extra
+       context for anyone reviewing later — amount, reference number, etc.) ---------- */
+    renderKeyPoints(points) {
+        const box = document.getElementById('taskKeyPoints');
+        if (!box) return;
+        box.innerHTML = '';
+        (points || []).forEach(p => this.addKeyPointRow(p.key || '', p.value || ''));
+    },
+
+    addKeyPointRow(key = '', value = '') {
+        const box = document.getElementById('taskKeyPoints');
+        if (!box) return;
+        const row = document.createElement('div');
+        row.className = 'keypoint-row';
+        row.innerHTML = `
+            <input type="text" class="kp-key" placeholder="Key (e.g. Amount)" value="${this.escAttr(key)}">
+            <input type="text" class="kp-value" placeholder="Value (e.g. 50,000)" value="${this.escAttr(value)}">
+            <button type="button" class="btn-icon bad kp-remove" onclick="this.closest('.keypoint-row').remove()" title="Remove">${this.SVGS.bin}</button>
+        `;
+        box.appendChild(row);
+    },
+
+    collectKeyPoints() {
+        const box = document.getElementById('taskKeyPoints');
+        if (!box) return [];
+        return Array.from(box.querySelectorAll('.keypoint-row')).map(row => ({
+            key: row.querySelector('.kp-key').value.trim(),
+            value: row.querySelector('.kp-value').value.trim()
+        })).filter(p => p.key || p.value);
+    },
+
     saveTask(e) {
         if (e && e.preventDefault) e.preventDefault();
 
@@ -3370,6 +3585,7 @@ const app = {
             recurrence: document.getElementById('taskRecurrence').value || 'None',
             notes: document.getElementById('taskNotes').value,
             paymentDetails: this.collectPaymentDetails(),
+            keyPoints: this.collectKeyPoints(),
             updatedAt: Date.now()
         };
 
@@ -3390,12 +3606,19 @@ const app = {
 
         const todayStr = this.getLocalDateStr(new Date());
         const editing = !!this.editingId;
+        let task, changeDetails = '';
 
         if (editing) {
-            const task = this.findTask(this.editingId);
+            task = this.findTask(this.editingId);
             if (!task) { this.showToast('That entry is no longer available.', 'error'); this.closeTaskModal(); return; }
 
             const dueChanged = (task.dueDate || '') !== fields.dueDate || (task.dueTime || '') !== fields.dueTime;
+            const statusChanged = (task.status || '') !== fields.status;
+            const changed = [];
+            if (dueChanged) changed.push('due date/time changed');
+            if (statusChanged) changed.push('status: ' + (task.status || '—') + ' → ' + fields.status);
+            changeDetails = changed.join(', ');
+
             Object.assign(task, fields);
             if (dueChanged) { task.lastAckDate = null; task.snoozeUntil = null; }
             if (this.storedEmailId) task.emailId = this.storedEmailId;
@@ -3406,7 +3629,7 @@ const app = {
                 task.completedDate = null;
             }
         } else {
-            const task = Object.assign({
+            task = Object.assign({
                 id: this.newId(),
                 dateLogged: todayStr,
                 deleted: false,
@@ -3424,7 +3647,7 @@ const app = {
         this.saveData();
         this.renderTable();
         this.processEngine();
-        this.logActivity((editing ? 'Updated task: "' : 'Added task: "') + desc + '"');
+        this.logTaskActivity(editing ? 'edited' : 'created', task, changeDetails);
         this.showToast(editing ? 'Entry updated.' : 'Entry added.', 'success');
         this.syncToGoogleSheets();
     },
@@ -3492,7 +3715,7 @@ const app = {
         this.saveData();
         this.renderTable();
         this.processEngine();
-        this.logActivity((repeat ? 'Completed (recurring): "' : 'Completed: "') + t.description + '"');
+        this.logTaskActivity(repeat ? 'completed (recurring)' : 'completed', t);
         this.showToast(
             repeat ? 'Done — next occurrence scheduled.' : 'Marked complete.',
             'success',
@@ -3525,7 +3748,7 @@ const app = {
         this.saveData();
         this.renderTable();
         this.processEngine();
-        this.logActivity('Reopened: "' + t.description + '"');
+        this.logTaskActivity('reopened', t);
         this.showToast('Entry reopened.', 'success');
         this.syncToGoogleSheets();
     },
@@ -3543,7 +3766,7 @@ const app = {
 
         this.saveData();
         this.renderTable();
-        this.logActivity('Moved to Bin: "' + t.description + '"');
+        this.logTaskActivity('binned', t);
         this.showToast('Moved to Bin.', 'success', { label: 'Undo', onClick: () => this.restoreTask(id) });
         this.syncToGoogleSheets();
     },
@@ -3559,7 +3782,7 @@ const app = {
         this.saveData();
         this.renderTable();
         this.processEngine();
-        this.logActivity('Restored from Bin: "' + t.description + '"');
+        this.logTaskActivity('restored', t);
         this.showToast('Entry restored.', 'success');
         this.syncToGoogleSheets();
     },
@@ -3575,7 +3798,7 @@ const app = {
 
         this.saveData();
         this.renderTable();
-        this.logActivity('Permanently deleted: "' + t.description + '"');
+        this.logTaskActivity('permanently deleted', t);
         this.showToast('Entry deleted permanently.', 'success');
         this.syncToGoogleSheets();
     },
